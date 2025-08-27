@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>VIPI | Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="../styles/style.css" rel="stylesheet" />
+</head>
+
+<body>
+    <header class="topbar">
+        <h1>Painel Administrativo</h1>
+        <nav>
+            <a href="./index.html">Catálogo Público</a>
+            <a id="logoutBtn" href="#">Sair</a>
+        </nav>
+    </header>
+
+    <main id="app">
+        <section class="cards">
+            <a class="card" href="#servicos">
+                <h2>Serviços</h2>
+                <p>CRUD de serviços, visibilidade (público/privado), upload de imagens.</p>
+            </a>
+            <a class="card" href="#estoque">
+                <h2>Estoque</h2>
+                <p>Ferramentas, estoque mínimo e alertas visuais.</p>
+            </a>
+            <a class="card" href="#relatorios">
+                <h2>Relatórios</h2>
+                <p>Estoque e financeiro básico.</p>
+            </a>
+        </section>
+
+        <section id="content"></section>
+    </main>
+
+    <footer class="footer">© VIPI Matrizes</footer>
+
+    <script type="module" src="./js/pages/admin-dashboard.js"></script>
+</body>
+
+</html>
