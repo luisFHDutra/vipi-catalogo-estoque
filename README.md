@@ -31,35 +31,6 @@ Perfis de acesso:
 
 ---
 
-## Estrutura do Projeto
-
-vipi-catalogo-estoque/
-├─ public/
-│ ├─ index.html # Catálogo público (Visitante)
-│ ├─ admin.html # Painel do Administrador
-│ ├─ login.html # Tela de login
-│ ├─ js/ # (gerado) saída compilada do TypeScript
-│ └─ assets/ # Imagens (logos, fotos de serviços etc.)
-├─ src/
-│ ├─ main.ts # Entry genérico/utilidades
-│ ├─ pages/
-│ │ ├─ public-catalog.ts # Lógica do catálogo público
-│ │ ├─ admin-dashboard.ts # Lógica do painel admin
-│ │ └─ login.ts # Lógica de autenticação (Bloco 2)
-│ ├─ modules/
-│ │ ├─ ui.ts # Funções utilitárias de UI
-│ │ ├─ types.ts # Tipos/Interfaces compartilhadas
-│ │ └─ validators.ts # Validações de formulário
-│ └─ supabase/
-│ └─ client.ts # Inicialização do Supabase (Bloco 2)
-├─ styles/
-│ └─ style.css # Estilos básicos (sem framework)
-├─ package.json
-├─ tsconfig.json
-└─ README.md
-
----
-
 ## Pré-requisitos
 
 - **Node.js** LTS (inclui `npm`)  
