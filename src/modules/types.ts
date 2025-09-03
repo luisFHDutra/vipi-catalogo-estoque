@@ -3,11 +3,13 @@ export type UUID = string;
 export interface Service {
     id: UUID;
     name: string;
-    description: string;
+    description?: string;
+    images?: string[];
     image_url?: string;
-    execution_time_minutes?: number; // sensível: ocultar na visão pública
-    cost?: number;                    // sensível: ocultar na visão pública
+    execution_time_minutes?: number;
+    charged_value?: number;
     is_public: boolean;
+    annotations?: any;
     created_at?: string;
 }
 
