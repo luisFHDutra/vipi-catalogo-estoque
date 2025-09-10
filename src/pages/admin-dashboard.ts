@@ -40,6 +40,7 @@ function setupMenu() {
     window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     document.getElementById("menuServicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); close(); });
     document.getElementById("menuNovo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); close(); });
+    document.getElementById("menuEstoque")?.addEventListener("click", () => close());
     document.getElementById("menuPublico")?.addEventListener("click", () => close());
     document.getElementById("menuLogout")?.addEventListener("click", async (e) => {
         e.preventDefault();
@@ -374,26 +375,35 @@ function openLightbox(images: string[], startIndex = 0) {
 }
 
 /* ===== Auth placeholder ===== */
+let isAuthenticated = false;
+
 async function ensureAuthenticated() {
+    if (isAuthenticated) return true;
+    
     if (isSupabaseConfigured) {
         const sb = await getSupabase();
         const { data: { session } } = await sb.auth.getSession();
         if (!session) {
             window.location.href = `./login.html?next=./admin.html`;
-            return;
+            return false;
         }
     } else {
         if (!isLocalLoggedIn()) {
             window.location.href = `./login.html?next=./admin.html`;
-            return;
+            return false;
         }
     }
+    
+    isAuthenticated = true;
+    return true;
 }
 
 
 /* ===== Render ===== */
 async function render() {
-    await ensureAuthenticated();
+    const authOk = await ensureAuthenticated();
+    if (!authOk) return;
+    
     const r = currentRoute();
     if (r.startsWith("#/editar/")) {
         const id = r.split("/")[2];
@@ -404,6 +414,7 @@ async function render() {
     if (r === "#/novo") return renderForm();
     return renderList();
 }
+
 window.addEventListener("hashchange", () => render());
 setupMenu();
 render();
