@@ -698,28 +698,28 @@ main {
         gap: calc(var(--gap) * 1);
         text-align: center;
     }
-    
+
     .header-nav {
         flex-direction: column;
         gap: 8px;
     }
-    
+
     .nav-link span {
         display: none;
     }
-    
+
     .search-container {
         flex-direction: column;
     }
-    
+
     .search-input {
         min-width: 100%;
     }
-    
+
     .toast {
         min-width: 280px;
     }
-    
+
     .modal {
         width: 95%;
         padding: calc(var(--gap) * 1.5);
@@ -1210,4 +1210,45 @@ main {
         left: 8px;
         right: 8px;
     }
+}
+
+/* ---- Wrapper padrão das páginas (centraliza conteúdo) ---- */
+.page {
+    width: min(980px, 92vw);
+    margin: 24px auto;
+}
+
+/* ---- Form sem conflito com .row de terceiros ---- */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 720px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Blindagem de inputs contra resets externos */
+.form label {
+    display: block !important;
+}
+
+.form label>input,
+.form label>textarea,
+.form label>select {
+    width: 100% !important;
+}
+
+/* (Opcional) deixa títulos e cards alinhados dentro do wrapper */
+.page>.card {
+    margin-bottom: 16px;
+}
+
+/* Garante que o formulário ocupe toda a largura do card nas telas do Admin */
+.page .form {
+    width: 100% !important;
+    max-width: none !important;
 }

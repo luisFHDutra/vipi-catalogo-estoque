@@ -59,8 +59,10 @@ function setupMenu() {
 
 // LISTA
 async function renderList() {
-    const container = view();
-    clear(container);
+    const root = view();
+    clear(root);
+
+    const page = el("div", { classes: ["page"] });
 
     const header = el("div", { classes: ["card"] });
     header.append(
@@ -80,7 +82,8 @@ async function renderList() {
         }
         const title = el("h3", { text: svc.name });
         const meta = el("p", {
-            classes: ["muted"], text:
+            classes: ["muted"],
+            text:
                 `${svc.is_public ? "Público" : "Privado"} • ` +
                 (svc.execution_time_minutes != null ? `${minutesToHours(svc.execution_time_minutes)} h` : "sem tempo") +
                 (svc.charged_value != null ? ` • Valor: R$ ${Number(svc.charged_value).toFixed(2)}` : "")
@@ -101,18 +104,21 @@ async function renderList() {
         actions.append(btnEdit, btnToggle, btnDel);
         card.append(title, meta, actions);
 
-        card.addEventListener("click", () => openDetailsModal(svc, /*publicMode*/ false));
+        card.addEventListener("click", () => openDetailsModal(svc, false));
         grid.append(card);
     });
 
-    container.append(header, grid);
+    page.append(header, grid);
+    root.append(page);
 }
+
 
 // FORM (novo/editar) — HORAS + VALOR COBRADO + múltiplas imagens
 function renderForm(existing?: Service) {
-    const container = view();
-    clear(container);
+    const root = view();
+    clear(root);
 
+    const page = el("div", { classes: ["page"] });      // << wrapper centralizador
     const box = el("div", { classes: ["card"] });
     box.append(el("h2", { text: existing ? "Editar Serviço" : "Cadastrar Serviço" }));
 
@@ -121,7 +127,7 @@ function renderForm(existing?: Service) {
     const fldName = el("input", { attrs: { id: "fName", required: "true", type: "text", placeholder: "Nome do serviço *" } }) as HTMLInputElement;
     const fldDesc = el("textarea", { attrs: { id: "fDesc", placeholder: "Descrição / Detalhes técnicos" } }) as HTMLTextAreaElement;
 
-    const row1 = el("div", { classes: ["row"] });
+    const row1 = el("div", { classes: ["form-row"] });
     const fldHours = el("input", { attrs: { id: "fHours", type: "number", min: "0", step: "0.25", placeholder: "Tempo total (horas)" } }) as HTMLInputElement;
     const fldValue = el("input", { attrs: { id: "fValue", type: "number", min: "0", step: "0.01", placeholder: "Valor cobrado (R$)" } }) as HTMLInputElement;
     row1.append(
@@ -129,13 +135,13 @@ function renderForm(existing?: Service) {
         wrap("Valor cobrado (R$)", fldValue)
     );
 
-    const row2 = el("div", { classes: ["row"] });
+    const row2 = el("div", { classes: ["form-row"] });
     const selVis = el("select", { attrs: { id: "fVis" } }) as HTMLSelectElement;
     selVis.append(new Option("Privado", "false"), new Option("Público", "true"));
     const fldImgs = el("input", { attrs: { id: "fImgs", type: "file", accept: "image/*", multiple: "true" } }) as HTMLInputElement;
     row2.append(wrap("Visibilidade", selVis), wrap("Imagens (múltiplas)", fldImgs, "Você pode selecionar várias fotos."));
 
-    const imagesBox = el("div"); // thumbnails e remover
+    const imagesBox = el("div");
     imagesBox.style.marginTop = "6px";
 
     const fldNotes = el("textarea", { attrs: { id: "fNotes", placeholder: 'Notas internas (JSON ou texto livre)' } }) as HTMLTextAreaElement;
@@ -156,7 +162,7 @@ function renderForm(existing?: Service) {
         el("p", { classes: ["note"], text: "Tempo/valor não aparecem no catálogo público." })
     );
 
-    // Estado: imagens atuais (para edição)
+    // Estado de imagens (igual ao seu)
     let currentImages: string[] = existing?.images?.slice() ?? (existing?.image_url ? [existing.image_url] : []);
 
     function refreshThumbs() {
@@ -207,11 +213,10 @@ function renderForm(existing?: Service) {
             charged_value: asNumber(fldValue.value),
             is_public: selVis.value === "true",
             annotations: tryParseJSON(fldNotes.value),
-            images: currentImages.slice() // começa com existentes; abaixo vamos anexar novas
+            images: currentImages.slice()
         };
         if (!payload.name) { alert("Nome é obrigatório."); return; }
 
-        // novas imagens (anexa ao array atual)
         const files = fldImgs.files;
         if (files && files.length > 0) {
             try {
@@ -222,8 +227,6 @@ function renderForm(existing?: Service) {
                 return;
             }
         }
-
-        // image_url = primeira da lista
         if (payload.images && payload.images.length) (payload as any).image_url = payload.images[0];
 
         if (!editingId) await createService(payload);
@@ -235,7 +238,8 @@ function renderForm(existing?: Service) {
     btnCancel.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
 
     box.append(form);
-    container.append(box);
+    page.append(box);
+    root.append(page);
 
     function wrap(label: string, field: HTMLElement, help?: string) {
         const w = el("label");
@@ -245,6 +249,7 @@ function renderForm(existing?: Service) {
         return w;
     }
 }
+
 
 // MODAL de detalhes com galeria (Admin)
 // publicMode=false: mostra tempo e valor; true: esconde.
@@ -379,7 +384,7 @@ let isAuthenticated = false;
 
 async function ensureAuthenticated() {
     if (isAuthenticated) return true;
-    
+
     if (isSupabaseConfigured) {
         const sb = await getSupabase();
         const { data: { session } } = await sb.auth.getSession();
@@ -393,7 +398,7 @@ async function ensureAuthenticated() {
             return false;
         }
     }
-    
+
     isAuthenticated = true;
     return true;
 }
@@ -403,7 +408,7 @@ async function ensureAuthenticated() {
 async function render() {
     const authOk = await ensureAuthenticated();
     if (!authOk) return;
-    
+
     const r = currentRoute();
     if (r.startsWith("#/editar/")) {
         const id = r.split("/")[2];
