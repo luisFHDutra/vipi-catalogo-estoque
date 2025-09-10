@@ -1,6 +1,7 @@
 import { el, clear } from "../modules/ui.js";
 import { listAllServices, createService, updateService, deleteService, uploadServiceImages, toggleVisibility } from "../modules/services-api.js";
 import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
+import { isLocalLoggedIn, localLogout } from "../modules/local-auth.js";
 /* ===== Helpers ===== */
 const view = () => document.getElementById("view");
 const HOUR = 60;
@@ -47,11 +48,12 @@ function setupMenu() {
         e.preventDefault();
         if (isSupabaseConfigured) {
             const sb = await getSupabase();
-            await sb.auth.signOut(); /* window.location.href = "./login.html"; */
+            await sb.auth.signOut();
         }
-        else
-            alert("Sair: modo local (sem Supabase).");
-        close();
+        else {
+            localLogout();
+        }
+        window.location.href = "./login.html";
     });
 }
 /* ===== Views ===== */
@@ -324,11 +326,20 @@ function openLightbox(images, startIndex = 0) {
 }
 /* ===== Auth placeholder ===== */
 async function ensureAuthenticated() {
-    if (!isSupabaseConfigured)
-        return;
-    const sb = await getSupabase();
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { /* window.location.href = "./login.html"; */ }
+    if (isSupabaseConfigured) {
+        const sb = await getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) {
+            window.location.href = `./login.html?next=./admin.html`;
+            return;
+        }
+    }
+    else {
+        if (!isLocalLoggedIn()) {
+            window.location.href = `./login.html?next=./admin.html`;
+            return;
+        }
+    }
 }
 /* ===== Render ===== */
 async function render() {
