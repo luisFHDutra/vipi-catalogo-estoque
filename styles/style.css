@@ -1070,7 +1070,10 @@ main {
 /* Use aspect-ratio para calcular a altura automaticamente.
    Assim evitamos "altura fixa" que induz crop. */
 .carousel .frame {
-    width: min(92vw, 720px);
+    /* Segue a largura interna do modal para não gerar scroll horizontal */
+    width: 100%;
+    /* Altura segura para caber na viewport em telas menores */
+    max-height: 60vh;
     aspect-ratio: 16 / 10;
     /* molde 16:10 (ajuste se quiser) */
     display: grid;
