@@ -1,89 +1,69 @@
+// services-api.ts
 import type { Service } from "./types.js";
-import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
-import * as local from "./fake-db.js";
+import { supabase } from "../supabase/supabaseClient.js";
 
-const BUCKET = "servicos";
+const TABLE = "service";
 
-/* ===== SUPABASE ===== */
-async function sb_uploadServiceImages(files: File[] | FileList): Promise<string[]> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
+/** Lista todos os serviços (qualquer visibilidade). */
+export async function listAllServices(): Promise<Service[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    const toPath = (name: string) => {
-        const ext = name.includes(".") ? name.split(".").pop() : "jpg";
-        return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    };
-
-    const urls: string[] = [];
-    for (const f of Array.from(files)) {
-        const p = toPath(f.name);
-        const { data, error } = await supabase.storage.from(BUCKET).upload(p, f, { cacheControl: "3600", upsert: false });
-        if (error) throw error;
-        const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
-        urls.push(pub.publicUrl);
-    }
-    return urls;
+  if (error) throw error;
+  return (data ?? []) as Service[];
 }
 
-async function sb_listAllServices(): Promise<Service[]> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await supabase.from("services")
-        .select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data as Service[];
+/** Lista apenas os serviços públicos (visibility = 'public'). */
+export async function listPublicServices(): Promise<Service[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id, name, description, total_time, price, visibility, notes, created_at")
+    .eq("visibility", "public")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Service[];
 }
 
-async function sb_listPublicServices(): Promise<Service[]> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await supabase.from("services")
-        .select("id, name, description, images, image_url, is_public, created_at")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data as Service[];
+/** Cria um novo serviço. */
+export async function createService(
+  payload: Omit<Service, "id" | "created_at">
+): Promise<Service> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as Service;
 }
 
-async function sb_createService(payload: Omit<Service, "id" | "created_at">): Promise<Service> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
-    const images = payload.images ?? (payload.image_url ? [payload.image_url] : []);
-    const image_url = images[0];
-    const { data, error } = await supabase.from("services")
-        .insert({ ...payload, images, image_url })
-        .select("*").single();
-    if (error) throw error;
-    return data as Service;
+/** Atualiza um serviço existente pelo ID. */
+export async function updateService(
+  id: number,
+  payload: Partial<Service>
+): Promise<Service> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as Service;
 }
 
-async function sb_updateService(id: string, payload: Partial<Service>): Promise<Service> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
-    const images = payload.images ?? (payload.image_url ? [payload.image_url] : undefined);
-    const patch = images ? { ...payload, image_url: images[0], images } : payload;
-    const { data, error } = await supabase.from("services")
-        .update(patch).eq("id", id).select("*").single();
-    if (error) throw error;
-    return data as Service;
+/** Remove um serviço pelo ID. */
+export async function deleteService(id: number): Promise<void> {
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
 }
 
-async function sb_deleteService(id: string): Promise<void> {
-    const supabase = await getSupabase();
-    if (!supabase) throw new Error("Supabase não configurado");
-    const { error } = await supabase.from("services").delete().eq("id", id);
-    if (error) throw error;
+/** Alterna a visibilidade entre 'public' e 'private'. */
+export async function toggleVisibility(id: number, makePublic: boolean): Promise<void> {
+  await updateService(id, { visibility: makePublic ? "public" : "private" } as Partial<Service>);
 }
-
-async function sb_toggleVisibility(id: string, makePublic: boolean): Promise<void> {
-    await sb_updateService(id, { is_public: makePublic });
-}
-
-/* ===== EXPORT: escolhe provider ===== */
-export const uploadServiceImages = isSupabaseConfigured ? sb_uploadServiceImages : local.uploadServiceImages;
-export const listAllServices = isSupabaseConfigured ? sb_listAllServices : local.listAllServices;
-export const listPublicServices = isSupabaseConfigured ? sb_listPublicServices : local.listPublicServices;
-export const createService = isSupabaseConfigured ? sb_createService : local.createService;
-export const updateService = isSupabaseConfigured ? sb_updateService : local.updateService;
-export const deleteService = isSupabaseConfigured ? sb_deleteService : local.deleteService;
-export const toggleVisibility = isSupabaseConfigured ? sb_toggleVisibility : local.toggleVisibility;

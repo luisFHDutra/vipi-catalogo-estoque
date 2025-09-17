@@ -1,283 +1,339 @@
 import { el, clear } from "../modules/ui.js";
-import type { Service } from "../modules/types.js";
-import {
-    listAllServices, createService, updateService, deleteService,
-    uploadServiceImages, toggleVisibility
-} from "../modules/services-api.js";
-import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
-import { isLocalLoggedIn, localLogout } from "../modules/local-auth.js";
+import { supabase } from "../supabase/supabaseClient.js";
+
+supabase.auth.onAuthStateChange(
+  (event: string, session: any) => {
+    console.log("Evento:", event);
+    console.log("Sessão:", session);
+  }
+);
+
+/* ===== Tipos (alinha com o schema) ===== */
+type DBService = {
+  id: number;
+  created_at: string | null;
+  name: string;
+  description: string | null;
+  total_time: number | null;   // horas
+  price: number | null;        // R$
+  visibility: "public" | "private" | null;
+  notes: string | null;
+  images: string[] | null;     // json[] com URLs
+};
 
 /* ===== Helpers ===== */
 const view = () => document.getElementById("view")!;
-const HOUR = 60;
-const minutesToHours = (min?: number) => min == null ? "" : (min / HOUR).toFixed(Number.isInteger(min / HOUR) ? 0 : 2);
-const hoursToMinutes = (h: string) => {
-    const n = Number(h.replace(",", "."));
-    return Number.isFinite(n) ? Math.round(n * HOUR) : undefined;
-};
 const asNumber = (v: string | null) => {
-    if (!v) return undefined;
-    const n = Number(v.replace(",", "."));
-    return Number.isFinite(n) ? n : undefined;
+  if (!v) return null;
+  const n = Number(v.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
 };
-const tryParseJSON = (t: string | null) => (!t || !t.trim()) ? undefined : (() => { try { return JSON.parse(t); } catch { return t; } })();
+const textOrNull = (t: string | null) => (!t || !t.trim()) ? null : t;
+
+const BUCKET = "service-images"; // Supabase Storage bucket (público)
+
+/** Upload múltiplo para o Storage -> retorna URLs públicas */
+async function uploadImages(files: FileList): Promise<string[]> {
+  const urls: string[] = [];
+  for (const file of Array.from(files)) {
+    const now = new Date();
+    const path = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
+    if (upErr) throw upErr;
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    if (!data?.publicUrl) throw new Error("Falha ao obter URL pública");
+    urls.push(data.publicUrl);
+  }
+  return urls;
+}
 
 /* ===== Router ===== */
 type Route = "#/servicos" | "#/novo" | `#/editar/${string}`;
 const currentRoute = (): Route => (window.location.hash || "#/servicos") as Route;
 const goto = (r: Route) => { if (window.location.hash !== r) window.location.hash = r; else render(); };
 
-/* ===== Menu (dropdown) ===== */
+/* ===== Menu ===== */
 function setupMenu() {
-    const btn = document.getElementById("menuBtn") as HTMLButtonElement | null;
-    const dd = document.getElementById("menuDropdown") as HTMLDivElement | null;
-    if (!btn || !dd) return;
-    const open = () => { dd.classList.add("show"); btn.setAttribute("aria-expanded", "true"); dd.setAttribute("aria-hidden", "false"); };
-    const close = () => { dd.classList.remove("show"); btn.setAttribute("aria-expanded", "false"); dd.setAttribute("aria-hidden", "true"); };
-    btn.addEventListener("click", (e) => { e.preventDefault(); dd.classList.contains("show") ? close() : open(); });
-    document.addEventListener("click", (e) => { const t = e.target as Node; if (!dd.contains(t) && !btn.contains(t)) close(); });
-    window.addEventListener("hashchange", close);
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
-    document.getElementById("menuServicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); close(); });
-    document.getElementById("menuNovo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); close(); });
-    document.getElementById("menuEstoque")?.addEventListener("click", () => close());
-    document.getElementById("menuPublico")?.addEventListener("click", () => close());
-    document.getElementById("menuLogout")?.addEventListener("click", async (e) => {
-        e.preventDefault();
-        if (isSupabaseConfigured) {
-            const sb = await getSupabase();
-            await sb.auth.signOut();
-        } else {
-            localLogout();
-        }
-        window.location.href = "./login.html";
-    });
+  const btn = document.getElementById("menuBtn") as HTMLButtonElement | null;
+  const dd = document.getElementById("menuDropdown") as HTMLDivElement | null;
+  if (!btn || !dd) return;
+  const open = () => { dd.classList.add("show"); btn.setAttribute("aria-expanded", "true"); dd.setAttribute("aria-hidden", "false"); };
+  const close = () => { dd.classList.remove("show"); btn.setAttribute("aria-expanded", "false"); dd.setAttribute("aria-hidden", "true"); };
+  btn.addEventListener("click", (e) => { e.preventDefault(); dd.classList.contains("show") ? close() : open(); });
+  document.addEventListener("click", (e) => { const t = e.target as Node; if (!dd.contains(t) && !btn.contains(t)) close(); });
+  window.addEventListener("hashchange", close);
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  document.getElementById("menuServicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); close(); });
+  document.getElementById("menuNovo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); close(); });
+  document.getElementById("menuEstoque")?.addEventListener("click", () => close());
+  document.getElementById("menuPublico")?.addEventListener("click", () => close());
+  document.getElementById("menuLogout")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await supabase.auth.signOut();
+    window.location.href = "./login.html";
+  });
+}
 
+/* ===== CRUD (Supabase) ===== */
+async function listAllServices(): Promise<DBService[]> {
+  const { data, error } = await supabase
+    .from("service")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DBService[];
+}
+
+async function getServiceById(id: number): Promise<DBService | null> {
+  const { data, error } = await supabase
+    .from("service")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DBService | null;
+}
+
+async function createService(payload: Omit<DBService, "id" | "created_at">) {
+  const { error } = await supabase.from("service").insert(payload);
+  if (error) throw error;
+}
+
+async function updateService(id: number, payload: Partial<Omit<DBService, "id" | "created_at">>) {
+  const { error } = await supabase.from("service").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteService(id: number) {
+  const { error } = await supabase.from("service").delete().eq("id", id);
+  if (error) throw error;
 }
 
 /* ===== Views ===== */
 
 // LISTA
 async function renderList() {
-    const root = view();
-    clear(root);
+  const root = view();
+  clear(root);
 
-    const page = el("div", { classes: ["page"] });
+  const page = el("div", { classes: ["page"] });
 
-    const header = el("div", { classes: ["card"] });
-    header.append(
-        el("h2", { text: "Serviços" }),
-        el("p", { classes: ["muted"], text: "Clique em um card para ver galeria e detalhes. Use os botões para editar, publicar/privar ou excluir." }),
-    );
+  const header = el("div", { classes: ["card"] });
+  header.append(
+    el("h2", { text: "Serviços" }),
+    el("p", { classes: ["muted"], text: "Clique em um card para ver detalhes. Use os botões para editar, publicar/privar ou excluir." }),
+  );
 
-    const grid = el("div", { classes: ["admin-grid"] });
-    const items = await listAllServices();
+  const grid = el("div", { classes: ["admin-grid"] });
+  const items = await listAllServices();
 
-    items.forEach(svc => {
-        const card = el("div", { classes: ["card"] });
-        const cover = (svc.images && svc.images[0]) || svc.image_url;
-        if (cover) {
-            const img = el("img", { attrs: { src: cover, alt: svc.name }, classes: ["img-cover"] });
-            card.append(img);
-        }
-        const title = el("h3", { text: svc.name });
-        const meta = el("p", {
-            classes: ["muted"],
-            text:
-                `${svc.is_public ? "Público" : "Privado"} • ` +
-                (svc.execution_time_minutes != null ? `${minutesToHours(svc.execution_time_minutes)} h` : "sem tempo") +
-                (svc.charged_value != null ? ` • Valor: R$ ${Number(svc.charged_value).toFixed(2)}` : "")
-        });
+  items.forEach(svc => {
+    const card = el("div", { classes: ["card"] });
 
-        const actions = el("div", { classes: ["admin-actions"] });
-        const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
-        const btnToggle = el("button", { classes: ["btn", "secondary"], text: svc.is_public ? "Tornar Privado" : "Tornar Público" });
-        const btnDel = el("button", { classes: ["btn", "danger"], text: "Excluir" });
+    const cover = svc.images?.[0];
+    if (cover) {
+      const img = el("img", { attrs: { src: cover, alt: svc.name }, classes: ["img-cover"] });
+      card.append(img);
+    }
 
-        btnEdit.addEventListener("click", (e) => { e.stopPropagation(); goto(`#/editar/${svc.id}`); });
-        btnToggle.addEventListener("click", async (e) => { e.stopPropagation(); await toggleVisibility(svc.id, !svc.is_public); await renderList(); });
-        btnDel.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            if (confirm(`Excluir "${svc.name}"?`)) { await deleteService(svc.id); await renderList(); }
-        });
-
-        actions.append(btnEdit, btnToggle, btnDel);
-        card.append(title, meta, actions);
-
-        card.addEventListener("click", () => openDetailsModal(svc, false));
-        grid.append(card);
+    const title = el("h3", { text: svc.name });
+    const meta = el("p", {
+      classes: ["muted"],
+      text:
+        `${svc.visibility === "public" ? "Público" : "Privado"} • ` +
+        (svc.total_time != null ? `${svc.total_time} h` : "sem tempo") +
+        (svc.price != null ? ` • Valor: R$ ${Number(svc.price).toFixed(2)}` : "")
     });
 
-    page.append(header, grid);
-    root.append(page);
-}
+    const actions = el("div", { classes: ["admin-actions"] });
+    const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
+    const btnToggle = el("button", { classes: ["btn", "secondary"], text: svc.visibility === "public" ? "Tornar Privado" : "Tornar Público" });
+    const btnDel = el("button", { classes: ["btn", "danger"], text: "Excluir" });
 
-
-// FORM (novo/editar) — HORAS + VALOR COBRADO + múltiplas imagens
-function renderForm(existing?: Service) {
-    const root = view();
-    clear(root);
-
-    const page = el("div", { classes: ["page"] });      // << wrapper centralizador
-    const box = el("div", { classes: ["card"] });
-    box.append(el("h2", { text: existing ? "Editar Serviço" : "Cadastrar Serviço" }));
-
-    const form = el("form", { classes: ["form"] });
-
-    const fldName = el("input", { attrs: { id: "fName", required: "true", type: "text", placeholder: "Nome do serviço *" } }) as HTMLInputElement;
-    const fldDesc = el("textarea", { attrs: { id: "fDesc", placeholder: "Descrição / Detalhes técnicos" } }) as HTMLTextAreaElement;
-
-    const row1 = el("div", { classes: ["form-row"] });
-    const fldHours = el("input", { attrs: { id: "fHours", type: "number", min: "0", step: "0.25", placeholder: "Tempo total (horas)" } }) as HTMLInputElement;
-    const fldValue = el("input", { attrs: { id: "fValue", type: "number", min: "0", step: "0.01", placeholder: "Valor cobrado (R$)" } }) as HTMLInputElement;
-    row1.append(
-        wrap("Tempo total (h)", fldHours, "Use horas decimais. Ex.: 1.5 = 1h30."),
-        wrap("Valor cobrado (R$)", fldValue)
-    );
-
-    const row2 = el("div", { classes: ["form-row"] });
-    const selVis = el("select", { attrs: { id: "fVis" } }) as HTMLSelectElement;
-    selVis.append(new Option("Privado", "false"), new Option("Público", "true"));
-    const fldImgs = el("input", { attrs: { id: "fImgs", type: "file", accept: "image/*", multiple: "true" } }) as HTMLInputElement;
-    row2.append(wrap("Visibilidade", selVis), wrap("Imagens (múltiplas)", fldImgs, "Você pode selecionar várias fotos."));
-
-    const imagesBox = el("div");
-    imagesBox.style.marginTop = "6px";
-
-    const fldNotes = el("textarea", { attrs: { id: "fNotes", placeholder: 'Notas internas (JSON ou texto livre)' } }) as HTMLTextAreaElement;
-
-    const bar = el("div");
-    const btnSave = el("button", { classes: ["btn"], text: "Salvar" });
-    const btnCancel = el("button", { classes: ["btn", "ghost"], text: "Cancelar" });
-    bar.append(btnSave, btnCancel);
-
-    form.append(
-        wrap("Nome do serviço *", fldName),
-        wrap("Descrição", fldDesc),
-        row1,
-        row2,
-        imagesBox,
-        wrap("Notas internas", fldNotes, "JSON será parseado; texto comum também é aceito."),
-        bar,
-        el("p", { classes: ["note"], text: "Tempo/valor não aparecem no catálogo público." })
-    );
-
-    // Estado de imagens (igual ao seu)
-    let currentImages: string[] = existing?.images?.slice() ?? (existing?.image_url ? [existing.image_url] : []);
-
-    function refreshThumbs() {
-        imagesBox.innerHTML = "";
-        if (!currentImages?.length) return;
-
-        const row = el("div", { classes: ["thumbs-row"] });
-        currentImages.forEach((url, idx) => {
-            const box = el("div", { classes: ["thumb"] });
-            const img = el("img", { attrs: { src: url, alt: `img-${idx}` } }) as HTMLImageElement;
-
-            const rm = el("button", { classes: ["btn", "danger", "rm"], text: "×" }) as HTMLButtonElement;
-            rm.addEventListener("click", (e) => {
-                e.preventDefault();
-                currentImages.splice(idx, 1);
-                refreshThumbs();
-            });
-
-            box.append(img, rm);
-            row.append(box);
-        });
-
-        imagesBox.append(row);
-    }
-
-    // Preencher se edição
-    let editingId: string | undefined;
-    if (existing) {
-        editingId = existing.id;
-        fldName.value = existing.name ?? "";
-        fldDesc.value = existing.description ?? "";
-        fldHours.value = minutesToHours(existing.execution_time_minutes);
-        fldValue.value = existing.charged_value != null ? String(existing.charged_value) : "";
-        selVis.value = String(!!existing.is_public);
-        fldNotes.value = existing.annotations
-            ? (typeof existing.annotations === "string" ? existing.annotations : JSON.stringify(existing.annotations, null, 2))
-            : "";
-    }
-    refreshThumbs();
-
-    form.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-
-        const payload: Omit<Service, "id" | "created_at"> = {
-            name: fldName.value.trim(),
-            description: fldDesc.value.trim() || undefined,
-            execution_time_minutes: hoursToMinutes(fldHours.value),
-            charged_value: asNumber(fldValue.value),
-            is_public: selVis.value === "true",
-            annotations: tryParseJSON(fldNotes.value),
-            images: currentImages.slice()
-        };
-        if (!payload.name) { alert("Nome é obrigatório."); return; }
-
-        const files = fldImgs.files;
-        if (files && files.length > 0) {
-            try {
-                const urls = await uploadServiceImages(files);
-                payload.images = [...(payload.images ?? []), ...urls];
-            } catch (e: any) {
-                alert("Falha no upload de imagens: " + (e?.message ?? e));
-                return;
-            }
-        }
-        if (payload.images && payload.images.length) (payload as any).image_url = payload.images[0];
-
-        if (!editingId) await createService(payload);
-        else await updateService(editingId, payload);
-
-        goto("#/servicos");
+    btnEdit.addEventListener("click", (e) => { e.stopPropagation(); goto(`#/editar/${svc.id}`); });
+    btnToggle.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const nextVis = svc.visibility === "public" ? "private" : "public";
+      await updateService(svc.id, { visibility: nextVis });
+      await renderList();
+    });
+    btnDel.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (confirm(`Excluir "${svc.name}"?`)) { await deleteService(svc.id); await renderList(); }
     });
 
-    btnCancel.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
+    actions.append(btnEdit, btnToggle, btnDel);
+    card.append(title, meta, actions);
 
-    box.append(form);
-    page.append(box);
-    root.append(page);
+    card.addEventListener("click", () => openDetailsModal(svc));
+    grid.append(card);
+  });
 
-    function wrap(label: string, field: HTMLElement, help?: string) {
-        const w = el("label");
-        w.append(el("span", { text: label }));
-        w.append(field);
-        if (help) w.append(el("div", { classes: ["note"], text: help }));
-        return w;
-    }
+  page.append(header, grid);
+  root.append(page);
 }
 
+// FORM (novo/editar) — com upload no Storage
+function renderForm(existing?: DBService) {
+  const root = view();
+  clear(root);
 
-// MODAL de detalhes com galeria (Admin)
-// publicMode=false: mostra tempo e valor; true: esconde.
-function openDetailsModal(svc: Service, publicMode: boolean) {
-    const bd = el("div", { classes: ["modal-backdrop", "show"] });
-    const m = el("div", { classes: ["modal"] });
+  const page = el("div", { classes: ["page"] });
+  const box = el("div", { classes: ["card"] });
+  box.append(el("h2", { text: existing ? "Editar Serviço" : "Cadastrar Serviço" }));
 
-    const head = el("header");
-    head.append(el("h3", { text: svc.name }));
+  const form = el("form", { classes: ["form"] });
 
-    const content = el("div", { classes: ["content"] });
+  const fldName = el("input", { attrs: { id: "fName", required: "true", type: "text", placeholder: "Nome do serviço *" } }) as HTMLInputElement;
+  const fldDesc = el("textarea", { attrs: { id: "fDesc", placeholder: "Descrição / Detalhes técnicos" } }) as HTMLTextAreaElement;
 
-    const imgs = (svc.images?.length ? svc.images : (svc.image_url ? [svc.image_url] : [])) as string[];
-    let idx = 0;
+  const row1 = el("div", { classes: ["form-row"] });
+  const fldHours = el("input", { attrs: { id: "fHours", type: "number", min: "0", step: "0.25", placeholder: "Tempo total (horas)" } }) as HTMLInputElement;
+  const fldValue = el("input", { attrs: { id: "fValue", type: "number", min: "0", step: "0.01", placeholder: "Valor cobrado (R$)" } }) as HTMLInputElement;
+  row1.append(
+    wrap("Tempo total (h)", fldHours, "Use horas decimais. Ex.: 1.5 = 1h30."),
+    wrap("Valor cobrado (R$)", fldValue)
+  );
 
-    // Galeria enxuta: 1 imagem visível + setas
+  const row2 = el("div", { classes: ["form-row"] });
+  const selVis = el("select", { attrs: { id: "fVis" } }) as HTMLSelectElement;
+  selVis.append(new Option("Privado", "private"), new Option("Público", "public"));
+  const fldImgs = el("input", { attrs: { id: "fImgs", type: "file", accept: "image/*", multiple: "true" } }) as HTMLInputElement;
+  row2.append(wrap("Visibilidade", selVis), wrap("Imagens (múltiplas)", fldImgs, "Você pode selecionar várias fotos."));
+
+  const imagesBox = el("div");
+  imagesBox.style.marginTop = "6px";
+
+  const fldNotes = el("textarea", { attrs: { id: "fNotes", placeholder: "Notas internas (texto ou JSON como string)" } }) as HTMLTextAreaElement;
+
+  const bar = el("div");
+  const btnSave = el("button", { classes: ["btn"], text: "Salvar" });
+  const btnCancel = el("button", { classes: ["btn", "ghost"], text: "Cancelar" });
+  bar.append(btnSave, btnCancel);
+
+  form.append(
+    wrap("Nome do serviço *", fldName),
+    wrap("Descrição", fldDesc),
+    row1,
+    row2,
+    imagesBox,
+    wrap("Notas internas", fldNotes, "Conteúdo é salvo como texto (pode conter JSON)."),
+    bar,
+    el("p", { classes: ["note"], text: "Tempo/valor não aparecem no catálogo público." })
+  );
+
+  // Estado UI (pré-visualização). Não persiste localmente, apenas mostra o que será gravado no DB.
+  let currentImages: string[] = existing?.images?.slice() ?? [];
+
+  function refreshThumbs() {
+    imagesBox.innerHTML = "";
+    if (!currentImages.length) return;
+
+    const row = el("div", { classes: ["thumbs-row"] });
+    currentImages.forEach((url, idx) => {
+      const box = el("div", { classes: ["thumb"] });
+      const img = el("img", { attrs: { src: url, alt: `img-${idx}` } }) as HTMLImageElement;
+
+      const rm = el("button", { classes: ["btn", "danger", "rm"], text: "×" }) as HTMLButtonElement;
+      rm.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentImages.splice(idx, 1);
+        refreshThumbs();
+      });
+
+      box.append(img, rm);
+      row.append(box);
+    });
+    imagesBox.append(row);
+  }
+
+  // Preencher se edição
+  let editingId: number | null = null;
+  if (existing) {
+    editingId = existing.id;
+    fldName.value = existing.name ?? "";
+    fldDesc.value = existing.description ?? "";
+    fldHours.value = existing.total_time != null ? String(existing.total_time) : "";
+    fldValue.value = existing.price != null ? String(existing.price) : "";
+    selVis.value = existing.visibility ?? "private";
+    fldNotes.value = existing.notes ?? "";
+  }
+  refreshThumbs();
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+
+    const payload: Omit<DBService, "id" | "created_at"> = {
+      name: fldName.value.trim(),
+      description: textOrNull(fldDesc.value),
+      total_time: asNumber(fldHours.value),
+      price: asNumber(fldValue.value),
+      visibility: (selVis.value as "public" | "private") || "private",
+      notes: textOrNull(fldNotes.value),
+      images: currentImages.slice(),
+    };
+    if (!payload.name) { alert("Nome é obrigatório."); return; }
+
+    // Upload para o Storage e gravação dos URLs no DB
+    const files = fldImgs.files;
+    if (files && files.length > 0) {
+      try {
+        const newUrls = await uploadImages(files);
+        payload.images = [...(payload.images ?? []), ...newUrls];
+      } catch (e: any) {
+        alert("Falha no upload de imagens: " + (e?.message ?? e));
+        return;
+      }
+    }
+
+    try {
+      if (editingId == null) await createService(payload);
+      else await updateService(editingId, payload);
+      goto("#/servicos");
+    } catch (e: any) {
+      alert("Erro ao salvar no Supabase: " + (e?.message ?? e));
+    }
+  });
+
+  btnCancel.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
+
+  box.append(form);
+  page.append(box);
+  root.append(page);
+
+  function wrap(label: string, field: HTMLElement, help?: string) {
+    const w = el("label");
+    w.append(el("span", { text: label }));
+    w.append(field);
+    if (help) w.append(el("div", { classes: ["note"], text: help }));
+    return w;
+  }
+}
+
+// MODAL de detalhes com galeria simples
+function openDetailsModal(svc: DBService) {
+  const bd = el("div", { classes: ["modal-backdrop", "show"] });
+  const m = el("div", { classes: ["modal"] });
+
+  const head = el("header");
+  head.append(el("h3", { text: svc.name }));
+
+  const content = el("div", { classes: ["content"] });
+
+  // galeria (somente URLs do DB)
+  const imgs = (svc.images ?? []) as string[];
+  let idx = 0;
+  if (imgs.length) {
     const gallery = el("div", { classes: ["carousel"] });
     const frame = el("div", { classes: ["frame"] });
-    const main = el("img", { classes: ["img"], attrs: { src: imgs[0] ?? "", alt: svc.name } }) as HTMLImageElement;
+    const main = el("img", { classes: ["img"], attrs: { src: imgs[0], alt: svc.name } }) as HTMLImageElement;
 
     function setIndex(i: number) {
-        if (!imgs.length) return;
-        idx = (i + imgs.length) % imgs.length;
-        main.src = imgs[idx];
+      if (!imgs.length) return;
+      idx = (i + imgs.length) % imgs.length;
+      main.src = imgs[idx];
     }
-
-    // Clique: abre LIGHTBOX (só imagem expande)
-    main.addEventListener("click", () => openLightbox(imgs, idx));
 
     const prev = el("div", { classes: ["nav", "prev"], text: "‹" });
     const next = el("div", { classes: ["nav", "next"], text: "›" });
@@ -287,137 +343,74 @@ function openDetailsModal(svc: Service, publicMode: boolean) {
     frame.append(main);
     gallery.append(frame);
     if (imgs.length > 1) gallery.append(prev, next);
-
     content.append(gallery);
+  }
 
-    // Metadados (sensíveis só no admin)
-    const kv = (k: string, v: string) => {
-        const row = el("div", { classes: ["kv"] });
-        row.append(el("div", { classes: ["k"], text: k }), el("div", { text: v }));
-        return row;
-    };
-    content.append(
-        kv("Visibilidade", svc.is_public ? "Público" : "Privado"),
-        ...(!publicMode ? [
-            kv("Tempo total", svc.execution_time_minutes != null ? `${minutesToHours(svc.execution_time_minutes)} h` : "—"),
-            kv("Valor cobrado", svc.charged_value != null ? `R$ ${Number(svc.charged_value).toFixed(2)}` : "—"),
-        ] : []),
-        kv("Criado em", svc.created_at ? new Date(svc.created_at).toLocaleString() : "—"),
-    );
+  // metadados
+  const kv = (k: string, v: string) => {
+    const row = el("div", { classes: ["kv"] });
+    row.append(el("div", { classes: ["k"], text: k }), el("div", { text: v }));
+    return row;
+  };
+  content.append(
+    kv("Visibilidade", svc.visibility === "public" ? "Público" : "Privado"),
+    kv("Tempo total", svc.total_time != null ? `${svc.total_time} h` : "—"),
+    kv("Valor cobrado", svc.price != null ? `R$ ${Number(svc.price).toFixed(2)}` : "—"),
+    kv("Criado em", svc.created_at ? new Date(svc.created_at).toLocaleString() : "—"),
+  );
 
-    if (svc.description) {
-        content.append(el("h4", { text: "Descrição" }), el("p", { text: svc.description }));
-    }
-    if (svc.annotations) {
-        content.append(el("h4", { text: "Anotações" }));
-        if (typeof svc.annotations === "object") {
-            const pre = el("pre"); pre.textContent = JSON.stringify(svc.annotations, null, 2);
-            content.append(pre);
-        } else {
-            content.append(el("p", { text: String(svc.annotations) }));
-        }
-    }
+  if (svc.description) {
+    content.append(el("h4", { text: "Descrição" }), el("p", { text: svc.description }));
+  }
+  if (svc.notes) {
+    content.append(el("h4", { text: "Notas" }));
+    const pre = el("pre"); pre.textContent = svc.notes;
+    content.append(pre);
+  }
 
-    const foot = el("footer");
-    const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
-    const btnClose = el("button", { classes: ["btn"], text: "Fechar" });
-    btnEdit.addEventListener("click", () => { document.body.removeChild(bd); goto(`#/editar/${svc.id}`); });
-    btnClose.addEventListener("click", () => document.body.removeChild(bd));
-    foot.append(btnEdit, btnClose);
+  const foot = el("footer");
+  const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
+  const btnClose = el("button", { classes: ["btn"], text: "Fechar" });
+  btnEdit.addEventListener("click", () => { document.body.removeChild(bd); goto(`#/editar/${svc.id}`); });
+  btnClose.addEventListener("click", () => document.body.removeChild(bd));
+  foot.append(btnEdit, btnClose);
 
-    // ESC fecha modal
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") cleanup(); }
-    function cleanup() {
-        document.removeEventListener("keydown", onKey);
-        try { document.body.removeChild(bd); } catch { }
-    }
+  function onKey(e: KeyboardEvent) { if (e.key === "Escape") cleanup(); }
+  function cleanup() {
+    document.removeEventListener("keydown", onKey);
+    try { document.body.removeChild(bd); } catch { }
+  }
 
-    m.append(head, content, foot);
-    bd.append(m);
-    bd.addEventListener("click", (e) => { if (e.target === bd) cleanup(); });
-    document.addEventListener("keydown", onKey);
-    document.body.appendChild(bd);
+  m.append(head, content, foot);
+  bd.append(m);
+  bd.addEventListener("click", (e) => { if (e.target === bd) cleanup(); });
+  document.addEventListener("keydown", onKey);
+  document.body.appendChild(bd);
 }
 
-// LIGHTBOX: expande só a imagem (navegação ←/→, fechar com ESC ou clique fora)
-function openLightbox(images: string[], startIndex = 0) {
-    if (!images.length) return;
-    let idx = startIndex;
-
-    const bd = el("div", { classes: ["lightbox-backdrop"] });
-    const box = el("div", { classes: ["lightbox"] });
-    const img = el("img", { classes: ["lightbox-img"], attrs: { src: images[idx] } }) as HTMLImageElement;
-
-    const prev = el("div", { classes: ["nav", "prev"], text: "‹" });
-    const next = el("div", { classes: ["nav", "next"], text: "›" });
-
-    function setIndex(i: number) {
-        idx = (i + images.length) % images.length;
-        img.src = images[idx];
-    }
-
-    prev.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx - 1); });
-    next.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx + 1); });
-
-    function onKey(e: KeyboardEvent) {
-        if (e.key === "Escape") cleanup();
-        if (images.length && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-            setIndex(e.key === "ArrowLeft" ? idx - 1 : idx + 1);
-        }
-    }
-    function cleanup() {
-        document.removeEventListener("keydown", onKey);
-        try { document.body.removeChild(bd); } catch { }
-    }
-
-    box.append(img);
-    if (images.length > 1) box.append(prev, next);
-    bd.append(box);
-
-    bd.addEventListener("click", (e) => { if (e.target === bd) cleanup(); });
-    document.addEventListener("keydown", onKey);
-    document.body.appendChild(bd);
-}
-
-/* ===== Auth placeholder ===== */
+/* ===== Auth (apenas Supabase) ===== */
 let isAuthenticated = false;
-
 async function ensureAuthenticated() {
-    if (isAuthenticated) return true;
-
-    if (isSupabaseConfigured) {
-        const sb = await getSupabase();
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) {
-            window.location.href = `./login.html?next=./admin.html`;
-            return false;
-        }
-    } else {
-        if (!isLocalLoggedIn()) {
-            window.location.href = `./login.html?next=./admin.html`;
-            return false;
-        }
-    }
-
-    isAuthenticated = true;
-    return true;
+  if (isAuthenticated) return true;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = `./login.html?next=./admin.html`; return false; }
+  isAuthenticated = true;
+  return true;
 }
-
 
 /* ===== Render ===== */
 async function render() {
-    const authOk = await ensureAuthenticated();
-    if (!authOk) return;
+  const authOk = await ensureAuthenticated();
+  if (!authOk) return;
 
-    const r = currentRoute();
-    if (r.startsWith("#/editar/")) {
-        const id = r.split("/")[2];
-        const all = await listAllServices();
-        const svc = all.find(s => s.id === id);
-        return renderForm(svc);
-    }
-    if (r === "#/novo") return renderForm();
-    return renderList();
+  const r = currentRoute();
+  if (r.startsWith("#/editar/")) {
+    const id = Number(r.split("/")[2]);
+    const svc = Number.isFinite(id) ? await getServiceById(id) : null;
+    return renderForm(svc ?? undefined);
+  }
+  if (r === "#/novo") return renderForm();
+  return renderList();
 }
 
 window.addEventListener("hashchange", () => render());

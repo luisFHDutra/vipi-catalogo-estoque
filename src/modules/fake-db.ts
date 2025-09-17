@@ -1,3 +1,4 @@
+/*
 import type { Service } from "./types.js";
 
 const KEY = "vipi_services_v1";
@@ -67,3 +68,4 @@ export async function deleteService(id: string): Promise<void> {
 export async function toggleVisibility(id: string, makePublic: boolean): Promise<void> {
     await updateService(id, { is_public: makePublic });
 }
+*/

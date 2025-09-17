@@ -1,6 +1,11 @@
-import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
+// topmenu.ts (ou .js)
+import { supabase } from "../supabase/supabaseClient.js";
 const ESTOQUE_PATH = "./estoque.html"; // ajuste se o nome do arquivo for outro
-function html(str) { const t = document.createElement("template"); t.innerHTML = str.trim(); return t.content.firstElementChild; }
+function html(str) {
+    const t = document.createElement("template");
+    t.innerHTML = str.trim();
+    return t.content.firstElementChild;
+}
 function ensureHeader(titleText) {
     let header = document.querySelector("header.topbar");
     if (!header) {
@@ -70,23 +75,21 @@ function wireMenu() {
     window.addEventListener("hashchange", close);
     document.getElementById("menuLogout")?.addEventListener("click", async (e) => {
         e.preventDefault();
-        if (isSupabaseConfigured) {
-            const sb = await getSupabase();
-            await sb.auth.signOut();
+        try {
+            await supabase.auth.signOut();
         }
-        else {
-            alert("Logout (modo local).");
+        finally {
+            window.location.href = "./login.html";
         }
-        window.location.href = "./login.html";
     });
 }
 function autoTitle() {
-    const p = window.location.pathname;
+    const p = window.location.pathname.toLowerCase();
     if (p.endsWith("/admin.html"))
         return "Painel Administrativo";
     if (p.endsWith("/index.html") || p.endsWith("/"))
         return "Catálogo de Serviços";
-    if (p.toLowerCase().includes("estoque"))
+    if (p.includes("estoque"))
         return "Estoque de Ferramentas";
     return "VIPI Matrizes";
 }

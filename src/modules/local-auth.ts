@@ -1,5 +1,6 @@
 // Autenticação local de desenvolvimento (sem Supabase)
 // Troque essas credenciais se quiser:
+/*
 const LOCAL_ADMIN_EMAIL = "admin@vipi.local";
 const LOCAL_ADMIN_PASSWORD = "123456";
 
@@ -32,3 +33,4 @@ export function getLocalSession(): LocalSession | null {
 export function isLocalLoggedIn(): boolean {
     return !!getLocalSession();
 }
+*/

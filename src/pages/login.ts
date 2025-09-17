@@ -1,64 +1,75 @@
-import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
-import { localLogin, isLocalLoggedIn } from "../modules/local-auth.js";
+// login.ts
+import { supabase } from "../supabase/supabaseClient.js";
 
-const form = () => document.getElementById("loginForm") as HTMLFormElement;
-const msg = () => document.getElementById("msg") as HTMLElement;
-const emailFld = () => document.getElementById("email") as HTMLInputElement;
-const passFld = () => document.getElementById("password") as HTMLInputElement;
+const $form  = () => document.getElementById("loginForm") as HTMLFormElement | null;
+const $msg   = () => document.getElementById("msg") as HTMLElement | null;
+const $email = () => document.getElementById("email") as HTMLInputElement | null;
+const $pass  = () => document.getElementById("password") as HTMLInputElement | null;
 
-function getNextUrl(): string {
-    const url = new URL(window.location.href);
-    const next = url.searchParams.get("next");
-    return next && next.startsWith("./") ? next : "./admin.html";
-}
+function setMsg(t: string) { if ($msg()) $msg()!.textContent = t; }
+function nextUrl(): string { return "./admin.html"; }
 
 async function supabaseLogin(email: string, password: string) {
-    const sb = await getSupabase();
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data.session;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session;
 }
 
 async function handleSubmit(ev: SubmitEvent) {
-    ev.preventDefault();
-    msg().textContent = "Entrando...";
-    const email = emailFld().value.trim();
-    const password = passFld().value;
+  ev.preventDefault();
 
-    try {
-        if (isSupabaseConfigured) {
-            await supabaseLogin(email, password);
-        } else {
-            // Modo local: aceita apenas as credenciais do local-auth.ts
-            const sess = localLogin(email, password);
-            if (!sess) throw new Error("Credenciais inválidas (modo local).");
-        }
-        window.location.href = getNextUrl();
-    } catch (e: any) {
-        msg().textContent = e?.message ?? "Falha no login.";
-    }
-}
+  const email = $email()?.value.trim() || "";
+  const password = $pass()?.value || "";
+  if (!email || !password) { setMsg("Informe e-mail e senha."); return; }
 
-function showDevHint() {
-    const hint = document.getElementById("devHint")!;
-    if (!isSupabaseConfigured) {
-        hint.textContent = "Modo local: use admin@vipi.local / 123456 (definido em src/modules/local-auth.ts)";
-    }
+  const submitBtn = $form()!.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+  if (submitBtn) submitBtn.disabled = true;
+
+  setMsg("Entrando...");
+  try {
+    await supabaseLogin(email, password);
+    // redireciona já; o listener de auth também cobre casos de latência
+    window.location.href = nextUrl();
+  } catch (e: any) {
+    setMsg(e?.message ?? "Falha no login. Tente novamente.");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }
 
 async function redirectIfLogged() {
-    if (isSupabaseConfigured) {
-        const sb = await getSupabase();
-        const { data: { session } } = await sb.auth.getSession();
-        if (session) window.location.href = getNextUrl();
-    } else {
-        if (isLocalLoggedIn()) window.location.href = getNextUrl();
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) window.location.href = nextUrl();
+  } catch {
+    // silencioso
+  }
+}
+
+function wireAuthListener() {
+  // Tipos simples para evitar TS7006 quando não há @supabase instalado localmente
+  supabase.auth.onAuthStateChange((event: string, session: any) => {
+    if (event === "SIGNED_IN" && session) {
+      window.location.href = nextUrl();
     }
+  });
 }
 
 function main() {
-    form().addEventListener("submit", handleSubmit);
-    showDevHint();
-    redirectIfLogged();
+  const form = $form();
+  if (!form) {
+    console.error("Formulário de login não encontrado (#loginForm).");
+    return;
+  }
+
+  form.addEventListener("submit", handleSubmit);
+  wireAuthListener();
+  redirectIfLogged();
 }
-main();
+
+// garante DOM pronto
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", main);
+} else {
+  main();
+}

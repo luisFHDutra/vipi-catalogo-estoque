@@ -1,32 +1,48 @@
+// public/js/pages/public-catalog.js (ou .ts)
 import { clear, el } from "../modules/ui.js";
-import { listPublicServices } from "../modules/services-api.js";
+import { supabase } from "../supabase/supabaseClient.js";
+/* ===== Data (Supabase) ===== */
+async function listPublicServices() {
+    const { data, error } = await supabase
+        .from("service")
+        .select("id, name, description, images, created_at")
+        .eq("visibility", "public")
+        .order("created_at", { ascending: false });
+    if (error)
+        throw error;
+    return (data ?? []);
+}
+/* ===== UI ===== */
 function openDetailsModalPublic(svc) {
     const bd = el("div", { classes: ["modal-backdrop", "show"] });
     const m = el("div", { classes: ["modal"] });
     const head = el("header");
     head.append(el("h3", { text: svc.name }));
     const content = el("div", { classes: ["content"] });
-    const imgs = (svc.images?.length ? svc.images : (svc.image_url ? [svc.image_url] : []));
+    const imgs = (svc.images ?? []);
     let idx = 0;
-    const gallery = el("div", { classes: ["carousel"] });
-    const frame = el("div", { classes: ["frame"] });
-    const main = el("img", { classes: ["img"], attrs: { src: imgs[0] ?? "", alt: svc.name } });
-    function setIndex(i) {
-        if (!imgs.length)
-            return;
-        idx = (i + imgs.length) % imgs.length;
-        main.src = imgs[idx];
+    // Galeria
+    if (imgs.length) {
+        const gallery = el("div", { classes: ["carousel"] });
+        const frame = el("div", { classes: ["frame"] });
+        const main = el("img", { classes: ["img"], attrs: { src: imgs[0], alt: svc.name } });
+        function setIndex(i) {
+            if (!imgs.length)
+                return;
+            idx = (i + imgs.length) % imgs.length;
+            main.src = imgs[idx];
+        }
+        main.addEventListener("click", () => openLightbox(imgs, idx));
+        const prev = el("div", { classes: ["nav", "prev"], text: "‹" });
+        const next = el("div", { classes: ["nav", "next"], text: "›" });
+        prev.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx - 1); });
+        next.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx + 1); });
+        frame.append(main);
+        gallery.append(frame);
+        if (imgs.length > 1)
+            gallery.append(prev, next);
+        content.append(gallery);
     }
-    main.addEventListener("click", () => openLightbox(imgs, idx));
-    const prev = el("div", { classes: ["nav", "prev"], text: "‹" });
-    const next = el("div", { classes: ["nav", "next"], text: "›" });
-    prev.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx - 1); });
-    next.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx + 1); });
-    frame.append(main);
-    gallery.append(frame);
-    if (imgs.length > 1)
-        gallery.append(prev, next);
-    content.append(gallery);
     if (svc.description) {
         content.append(el("h4", { text: "Descrição" }), el("p", { text: svc.description }));
     }
@@ -50,7 +66,7 @@ function openDetailsModalPublic(svc) {
     document.addEventListener("keydown", onKey);
     document.body.appendChild(bd);
 }
-/* Lightbox igual ao do Admin (cole abaixo da função acima) */
+/* Lightbox */
 function openLightbox(images, startIndex = 0) {
     if (!images.length)
         return;
@@ -91,7 +107,7 @@ function openLightbox(images, startIndex = 0) {
 }
 function card(svc) {
     const a = el("div", { classes: ["card"] });
-    const cover = (svc.images && svc.images[0]) || svc.image_url;
+    const cover = svc.images?.[0];
     if (cover) {
         const img = document.createElement("img");
         img.src = cover;
@@ -101,15 +117,20 @@ function card(svc) {
     }
     const title = el("h3", { text: svc.name });
     const desc = el("p", { text: svc.description ?? "" });
-    const badge = el("span", { classes: ["badge"], text: "Público" });
-    a.append(title, desc, badge);
+    a.append(title, desc);
     a.addEventListener("click", () => openDetailsModalPublic(svc));
     return a;
 }
 async function main() {
     const grid = document.getElementById("services-grid");
     clear(grid);
-    const services = await listPublicServices();
-    services.forEach(s => grid.appendChild(card(s)));
+    try {
+        const services = await listPublicServices();
+        services.forEach(s => grid.appendChild(card(s)));
+    }
+    catch (e) {
+        console.error(e);
+        grid.append(el("p", { classes: ["note"], text: "Falha ao carregar os serviços." }));
+    }
 }
-main().catch(console.error);
+main();

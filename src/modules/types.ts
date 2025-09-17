@@ -1,16 +1,15 @@
 export type UUID = string;
 
 export interface Service {
-    id: UUID;
-    name: string;
-    description?: string;
-    images?: string[];
-    image_url?: string;
-    execution_time_minutes?: number;
-    charged_value?: number;
-    is_public: boolean;
-    annotations?: any;
-    created_at?: string;
+  id: number;
+  created_at: string;       // Timestamp vindo do Supabase
+  name: string;
+  description?: string;
+  total_time?: number;       // Horas ou minutos, conforme regra de negócio
+  price?: number;            // Preço do serviço
+  visibility: "public" | "private"; // Controle de exibição
+  notes?: string;    
+  images: string[];       // Observações (opcional)
 }
 
 export interface Tool {

@@ -1,89 +1,56 @@
-import { getSupabase, isSupabaseConfigured } from "../supabase/client.js";
-import * as local from "./fake-db.js";
-const BUCKET = "servicos";
-/* ===== SUPABASE ===== */
-async function sb_uploadServiceImages(files) {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const toPath = (name) => {
-        const ext = name.includes(".") ? name.split(".").pop() : "jpg";
-        return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    };
-    const urls = [];
-    for (const f of Array.from(files)) {
-        const p = toPath(f.name);
-        const { data, error } = await supabase.storage.from(BUCKET).upload(p, f, { cacheControl: "3600", upsert: false });
-        if (error)
-            throw error;
-        const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
-        urls.push(pub.publicUrl);
-    }
-    return urls;
-}
-async function sb_listAllServices() {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const { data, error } = await supabase.from("services")
-        .select("*").order("created_at", { ascending: false });
-    if (error)
-        throw error;
-    return data;
-}
-async function sb_listPublicServices() {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const { data, error } = await supabase.from("services")
-        .select("id, name, description, images, image_url, is_public, created_at")
-        .eq("is_public", true)
+import { supabase } from "../supabase/supabaseClient.js";
+const TABLE = "service";
+/** Lista todos os serviços (qualquer visibilidade). */
+export async function listAllServices() {
+    const { data, error } = await supabase
+        .from(TABLE)
+        .select("*")
         .order("created_at", { ascending: false });
     if (error)
         throw error;
-    return data;
+    return (data ?? []);
 }
-async function sb_createService(payload) {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const images = payload.images ?? (payload.image_url ? [payload.image_url] : []);
-    const image_url = images[0];
-    const { data, error } = await supabase.from("services")
-        .insert({ ...payload, images, image_url })
-        .select("*").single();
+/** Lista apenas os serviços públicos (visibility = 'public'). */
+export async function listPublicServices() {
+    const { data, error } = await supabase
+        .from(TABLE)
+        .select("id, name, description, total_time, price, visibility, notes, created_at")
+        .eq("visibility", "public")
+        .order("created_at", { ascending: false });
+    if (error)
+        throw error;
+    return (data ?? []);
+}
+/** Cria um novo serviço. */
+export async function createService(payload) {
+    const { data, error } = await supabase
+        .from(TABLE)
+        .insert(payload)
+        .select("*")
+        .single();
     if (error)
         throw error;
     return data;
 }
-async function sb_updateService(id, payload) {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const images = payload.images ?? (payload.image_url ? [payload.image_url] : undefined);
-    const patch = images ? { ...payload, image_url: images[0], images } : payload;
-    const { data, error } = await supabase.from("services")
-        .update(patch).eq("id", id).select("*").single();
+/** Atualiza um serviço existente pelo ID. */
+export async function updateService(id, payload) {
+    const { data, error } = await supabase
+        .from(TABLE)
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single();
     if (error)
         throw error;
     return data;
 }
-async function sb_deleteService(id) {
-    const supabase = await getSupabase();
-    if (!supabase)
-        throw new Error("Supabase não configurado");
-    const { error } = await supabase.from("services").delete().eq("id", id);
+/** Remove um serviço pelo ID. */
+export async function deleteService(id) {
+    const { error } = await supabase.from(TABLE).delete().eq("id", id);
     if (error)
         throw error;
 }
-async function sb_toggleVisibility(id, makePublic) {
-    await sb_updateService(id, { is_public: makePublic });
+/** Alterna a visibilidade entre 'public' e 'private'. */
+export async function toggleVisibility(id, makePublic) {
+    await updateService(id, { visibility: makePublic ? "public" : "private" });
 }
-/* ===== EXPORT: escolhe provider ===== */
-export const uploadServiceImages = isSupabaseConfigured ? sb_uploadServiceImages : local.uploadServiceImages;
-export const listAllServices = isSupabaseConfigured ? sb_listAllServices : local.listAllServices;
-export const listPublicServices = isSupabaseConfigured ? sb_listPublicServices : local.listPublicServices;
-export const createService = isSupabaseConfigured ? sb_createService : local.createService;
-export const updateService = isSupabaseConfigured ? sb_updateService : local.updateService;
-export const deleteService = isSupabaseConfigured ? sb_deleteService : local.deleteService;
-export const toggleVisibility = isSupabaseConfigured ? sb_toggleVisibility : local.toggleVisibility;
