@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>VIPI | Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="styles/style.css" rel="stylesheet" />
+    <link rel="icon" href="data:,">
+    <style>
+        .center {
+            display: grid;
+            place-items: center;
+            min-height: 70vh;
+        }
+
+        .login-card {
+            width: min(420px, 92vw);
+        }
+
+        .login-card h2 {
+            margin-top: 0;
+            color: var(--main);
+        }
+
+        .muted-center {
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <img class="logo" src="./assets/logo-vipimatrizes.jpg" alt="VIPI Matrizes" />
+            <strong>Login</strong>
+        </div>
+    </header>
+
+    <main class="center">
+        <section class="card login-card">
+            <h2>Acessar</h2>
+            <form id="loginForm" class="form">
+                <label>
+                    E-mail
+                    <input type="text" id="email" autocomplete="username" required placeholder="admin@empresa.com" />
+                </label>
+                <label>
+                    Senha
+                    <input type="password" id="password" autocomplete="current-password" required
+                        placeholder="••••••••" />
+                </label>
+                <div>
+                    <button class="btn" type="submit">Entrar</button>
+                    <a class="btn ghost" href="./index.html">Voltar</a>
+                </div>
+                <p id="msg" class="muted-center"></p>
+            </form>
+            <p class="muted-center" id="devHint" style="margin-top:8px;"></p>
+        </section>
+    </main>
+
+    <footer class="footer">© VIPI Matrizes</footer>
+    <script type="module" src="./js/pages/login.js"></script>
+</body>
+
+</html>
