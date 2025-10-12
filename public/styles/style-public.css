@@ -1,0 +1,452 @@
+/* ===== VIPI | Catálogo Público (isolado) ===== */
+.catalog-body,
+.catalog-body * {
+    box-sizing: border-box;
+}
+
+.catalog-body {
+    --gap: 16px;
+    --bg: #fff;
+    --fg: #222;
+    --muted: #667085;
+    --border: #e5e7eb;
+    --main: #003366;
+    /* azul VIPI */
+    --sec1: #006666;
+    /* teal */
+    --sec2: #000066;
+    /* azul escuro */
+    --danger: #dc3545;
+
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== NAVBAR (mesmo estilo da homepage) ===== */
+.catalog-body .navbar {
+    display: flex;
+    justify-content: center;
+    /* como na homepage */
+    align-items: center;
+    padding: 15px 20px;
+    background: #000066;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+    gap: 40px;
+}
+
+.catalog-body .logo {
+    margin-right: 40px;
+}
+
+.catalog-body .logo img {
+    height: 65px;
+    width: 170px;
+    display: block;
+}
+
+.catalog-body .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 12px;
+    margin-right: 100px;
+    transform: translateX(-40px);
+}
+
+.catalog-body .nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: .9rem;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 6px;
+    background-color: #000066;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
+    transition: all .3s ease;
+}
+
+.catalog-body .nav-links a:hover,
+.catalog-body .nav-links a.active {
+    background-color: #00ccaa;
+    color: #003366;
+    border-color: #00ccaa;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+}
+
+.catalog-body .hide {
+    display: none !important;
+}
+
+/* ===== LAYOUT ===== */
+.catalog-body main {
+    padding: 24px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.catalog-body .footer {
+    margin-top: auto;
+    background: #000066;
+    color: #fff;
+    text-align: center;
+    padding: 15px;
+}
+
+/* ===== GRID: 4 colunas no desktop ===== */
+.catalog-body .grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+    .catalog-body .grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .catalog-body .grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .catalog-body .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== CARD ===== */
+/* visual “card” da homepage (branco + borda top teal) */
+.catalog-body .card {
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-top: 6px solid var(--sec1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    cursor: pointer;
+}
+
+.catalog-body .card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .12);
+    border-color: #d7dbe2;
+}
+
+.catalog-body .card h3 {
+    margin: 12px 0 6px;
+    color: var(--sec2);
+    font-size: 1rem;
+}
+
+.catalog-body .card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .92rem;
+    line-height: 1.35;
+}
+
+/* imagem de capa sem corte */
+.catalog-body .img-cover {
+    width: 100%;
+    height: 190px;
+    object-fit: contain !important;
+    background: #f5f7fb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+/* ===== BOTÃO (modal Fechar) ===== */
+.catalog-body .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--main);
+    background: var(--main);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter .15s ease, transform .1s ease;
+}
+
+.catalog-body .btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+
+/* ===== MODAL (detalhes) ===== */
+.catalog-body .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.catalog-body .modal-backdrop.show {
+    display: flex;
+}
+
+.catalog-body .modal {
+    background: #fff;
+    color: var(--fg);
+    border-radius: 12px;
+    width: min(680px, 92vw);
+    max-height: 88vh;
+    overflow: auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(2, 6, 23, .25);
+}
+
+.catalog-body .modal header,
+.catalog-body .modal footer {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.catalog-body .modal footer {
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    text-align: right;
+}
+
+.catalog-body .modal .content {
+    padding: 16px;
+}
+
+.catalog-body .modal h3 {
+    margin: 0;
+    color: var(--main);
+}
+
+/* ===== Galeria dentro do modal ===== */
+.catalog-body .carousel {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+.catalog-body .carousel .frame {
+    width: 100%;
+    aspect-ratio: 16/10;
+    max-height: 60vh;
+    display: grid;
+    place-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.catalog-body .carousel .img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+    cursor: zoom-in;
+}
+
+.catalog-body .carousel .nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, .95);
+    border: 1px solid var(--border);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.catalog-body .carousel .prev {
+    left: 8px;
+}
+
+.catalog-body .carousel .next {
+    right: 8px;
+}
+
+.catalog-body .carousel .nav:hover {
+    background: #fff;
+}
+
+/* ===== Lightbox ===== */
+.catalog-body .lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2100;
+}
+
+.catalog-body .lightbox {
+    position: relative;
+    max-width: 96vw;
+    max-height: 96vh;
+}
+
+.catalog-body .lightbox-img {
+    max-width: 96vw;
+    max-height: 96vh;
+    object-fit: contain;
+    background: #000;
+    border-radius: 4px;
+}
+
+.catalog-body .lightbox .nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, .95);
+    border: 1px solid var(--border);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 22px;
+}
+
+.catalog-body .lightbox .prev {
+    left: -56px;
+}
+
+.catalog-body .lightbox .next {
+    right: -56px;
+}
+
+@media (max-width:768px) {
+    .catalog-body .lightbox .prev {
+        left: 8px;
+    }
+
+    .catalog-body .lightbox .next {
+        right: 8px;
+    }
+}
+
+/* Thumb dos cards – mostra a imagem inteira e padroniza o tamanho */
+.grid .card .img-cover {
+    display: block;
+    width: 100%;
+    height: 180px;
+    /* altura fixa (fallback) */
+    object-fit: contain !important;
+    /* NÃO corta; letterboxing quando necessário */
+    object-position: center center;
+    background: #f8fafc;
+    /* “fundo” para as bordas (letterbox) */
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+/* Preferir aspect-ratio quando suportado, para um frame mais responsivo */
+@supports (aspect-ratio: 1) {
+    .grid .card .img-cover {
+        height: auto;
+        aspect-ratio: 16 / 10;
+        /* todos os thumbs ficam do mesmo “formato” */
+    }
+}
+
+/* Evita que o card corte a imagem caso ela ultrapasse algo por bug de layout */
+.grid .card {
+    overflow: visible;
+}
+
+/* container do carrossel no modal */
+.modal .carousel {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+/* moldura que recebe a imagem: centraliza e limita a altura */
+.modal .carousel .frame {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    /* evita barras se a imagem for gigante */
+    max-height: 70vh;
+    /* limite seguro na viewport */
+}
+
+/* imagem principal do modal: NUNCA corta */
+.modal .carousel .img {
+    max-width: 100%;
+    max-height: 60vh;
+    /* mantém boa área dentro do frame */
+    width: auto;
+    height: auto;
+    object-fit: contain !important;
+    /* mostra a imagem inteira */
+    object-position: center center;
+    display: block;
+    background: #f8fafc;
+    /* “letterbox” agradável quando sobrar espaço */
+}
+
+/* setas de navegação (opcional, só para garantir) */
+.modal .carousel .nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, .95);
+    border: 1px solid var(--border);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    user-select: none;
+    cursor: pointer;
+}
+
+.modal .carousel .prev {
+    left: 8px;
+}
+
+.modal .carousel .next {
+    right: 8px;
+}
+
+/* Lightbox também sem cortes (quando clica na imagem do modal) */
+.lightbox-img {
+    max-width: 96vw;
+    max-height: 96vh;
+    width: auto;
+    height: auto;
+    object-fit: contain !important;
+    background: #000;
+}

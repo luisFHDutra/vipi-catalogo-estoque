@@ -5,29 +5,22 @@
     <meta charset="UTF-8" />
     <title>VIPI | Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link href="styles/style.css" rel="stylesheet" />
+    <link href="styles/style-admin.css" rel="stylesheet" />
     <link rel="icon" href="data:,">
 </head>
 
-<body>
-    <header class="topbar">
-        <div class="brand">
-            <img class="logo" src="./assets/logo-vipimatrizes.jpg" alt="VIPI Matrizes" />
-            <strong>Painel Administrativo</strong>
-        </div>
-
-        <div class="menu">
-            <button id="menuBtn" class="btn ghost" aria-expanded="false" aria-controls="menuDropdown">
-                Menu ▾
-            </button>
-            <div id="menuDropdown" class="dropdown" role="menu" aria-hidden="true">
-                <a href="#/servicos" id="menuServicos" role="menuitem">Serviços</a>
-                <a href="#/novo" id="menuNovo" role="menuitem">Cadastrar Serviço</a>
-                <a href="./estoque.html" id="menuEstoque" role="menuitem">Gerenciar Estoque</a>
-                <a href="./index.html" id="menuPublico" role="menuitem">Catálogo Público</a>
-                <a href="#" id="menuLogout" role="menuitem">Sair</a>
-            </div>
-        </div>
+<body class="admin-body">
+    <header class="navbar admin-nav">
+        <a href="homepage.html" class="logo">
+            <img src="assets/logo-vipi-sem-fundo.png" alt="Logo VIPI Matrizes">
+        </a>
+        <ul class="nav-links">
+            <li><a href="#" id="nav-servicos">Serviços</a></li>
+            <li><a href="#" id="nav-novo">Cadastrar</a></li>
+            <li><a href="estoque.html" id="nav-estoque">Estoque</a></li>
+            <li><a href="index.html" id="nav-publico" target="_blank">Catálogo</a></li>
+            <li><a href="#" id="nav-sair">Sair</a></li>
+        </ul>
     </header>
 
     <main id="app">

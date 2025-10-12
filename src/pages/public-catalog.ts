@@ -1,6 +1,41 @@
-// public/js/pages/public-catalog.js (ou .ts)
+// src/pages/public-catalog.ts
 import { clear, el } from "../modules/ui.js";
 import { supabase } from "../supabase/supabaseClient.js";
+
+/* ========= UI por autenticação (mostra botões de admin/estoque quando logado) ========= */
+const loginBtn = document.getElementById("btn-login");
+const logoutBtn = document.getElementById("btn-logout");
+
+function authEls(): NodeListOf<HTMLElement> {
+  return document.querySelectorAll<HTMLElement>(".auth-only");
+}
+
+function applyAuthUI(session: any) {
+  const isIn = !!session;
+  authEls().forEach(el => el.classList.toggle("hide", !isIn));
+  loginBtn?.classList.toggle("hide", isIn);
+  logoutBtn?.classList.toggle("hide", !isIn);
+}
+
+(async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    applyAuthUI(session);
+  } catch { /* ignore */ }
+})();
+
+supabase.auth.onAuthStateChange((_event: string, session: any) => applyAuthUI(session));
+
+logoutBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  try { await supabase.auth.signOut(); } finally { location.reload(); }
+});
+
+/* (defensivo) Se ainda existir algum <h2> na seção principal, remove */
+(() => {
+  const title = document.querySelector("main section h2");
+  if (title) title.remove();
+})();
 
 /* ===== Tipos (apenas o que usamos no catálogo público) ===== */
 type PublicService = {
@@ -72,7 +107,7 @@ function openDetailsModalPublic(svc: PublicService) {
 
   function cleanup() {
     document.removeEventListener("keydown", onKey);
-    try { document.body.removeChild(bd); } catch {}
+    try { document.body.removeChild(bd); } catch { /* noop */ }
   }
   function onKey(e: KeyboardEvent) { if (e.key === "Escape") cleanup(); }
 
@@ -111,7 +146,7 @@ function openLightbox(images: string[], startIndex = 0) {
   }
   function cleanup() {
     document.removeEventListener("keydown", onKey);
-    try { document.body.removeChild(bd); } catch {}
+    try { document.body.removeChild(bd); } catch { /* noop */ }
   }
 
   box.append(img);
@@ -144,7 +179,12 @@ function card(svc: PublicService): HTMLElement {
 }
 
 async function main() {
-  const grid = document.getElementById("services-grid")!;
+  const grid = document.getElementById("services-grid") as HTMLElement | null;
+  if (!grid) return;
+
+  // garante classes de grid (caso o HTML não tenha)
+  grid.classList.add("grid");
+
   clear(grid);
 
   try {

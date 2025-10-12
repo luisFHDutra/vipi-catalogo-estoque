@@ -35,28 +35,16 @@ const goto = (r) => { if (window.location.hash !== r)
     window.location.hash = r;
 else
     render(); };
-/* ===== Menu ===== */
-function setupMenu() {
-    const btn = document.getElementById("menuBtn");
-    const dd = document.getElementById("menuDropdown");
-    if (!btn || !dd)
-        return;
-    const open = () => { dd.classList.add("show"); btn.setAttribute("aria-expanded", "true"); dd.setAttribute("aria-hidden", "false"); };
-    const close = () => { dd.classList.remove("show"); btn.setAttribute("aria-expanded", "false"); dd.setAttribute("aria-hidden", "true"); };
-    btn.addEventListener("click", (e) => { e.preventDefault(); dd.classList.contains("show") ? close() : open(); });
-    document.addEventListener("click", (e) => { const t = e.target; if (!dd.contains(t) && !btn.contains(t))
-        close(); });
-    window.addEventListener("hashchange", close);
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape")
-        close(); });
-    document.getElementById("menuServicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); close(); });
-    document.getElementById("menuNovo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); close(); });
-    document.getElementById("menuEstoque")?.addEventListener("click", () => close());
-    document.getElementById("menuPublico")?.addEventListener("click", () => close());
-    document.getElementById("menuLogout")?.addEventListener("click", async (e) => {
+/* ===== Navegação superior (estilo homepage) ===== */
+function setupTopNav() {
+    document.getElementById("nav-servicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
+    document.getElementById("nav-novo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); });
+    document.getElementById("nav-estoque")?.addEventListener("click", () => { });
+    document.getElementById("nav-publico")?.addEventListener("click", () => { });
+    document.getElementById("nav-sair")?.addEventListener("click", async (e) => {
         e.preventDefault();
         await supabase.auth.signOut();
-        window.location.href = "./login.html";
+        window.location.href = "./homepage.html";
     });
 }
 /* ===== CRUD (Supabase) ===== */
@@ -100,8 +88,6 @@ async function renderList() {
     const root = view();
     clear(root);
     const page = el("div", { classes: ["page"] });
-    const header = el("div", { classes: ["card"] });
-    header.append(el("h2", { text: "Serviços" }), el("p", { classes: ["muted"], text: "Clique em um card para ver detalhes. Use os botões para editar, publicar/privar ou excluir." }));
     const grid = el("div", { classes: ["admin-grid"] });
     const items = await listAllServices();
     items.forEach(svc => {
@@ -141,7 +127,7 @@ async function renderList() {
         card.addEventListener("click", () => openDetailsModal(svc));
         grid.append(card);
     });
-    page.append(header, grid);
+    page.append(grid);
     root.append(page);
 }
 // FORM (novo/editar) — com upload no Storage
@@ -330,7 +316,8 @@ async function ensureAuthenticated() {
         return true;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-        window.location.href = `./login.html?next=./admin.html`;
+        // usa o login da homepage e abre modal automaticamente
+        window.location.href = `./homepage.html?login=1&next=./admin.html`;
         return false;
     }
     isAuthenticated = true;
@@ -352,5 +339,5 @@ async function render() {
     return renderList();
 }
 window.addEventListener("hashchange", () => render());
-setupMenu();
+setupTopNav();
 render();

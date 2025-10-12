@@ -1,6 +1,41 @@
-// public/js/pages/public-catalog.js (ou .ts)
+// src/pages/public-catalog.ts
 import { clear, el } from "../modules/ui.js";
 import { supabase } from "../supabase/supabaseClient.js";
+/* ========= UI por autenticação (mostra botões de admin/estoque quando logado) ========= */
+const loginBtn = document.getElementById("btn-login");
+const logoutBtn = document.getElementById("btn-logout");
+function authEls() {
+    return document.querySelectorAll(".auth-only");
+}
+function applyAuthUI(session) {
+    const isIn = !!session;
+    authEls().forEach(el => el.classList.toggle("hide", !isIn));
+    loginBtn?.classList.toggle("hide", isIn);
+    logoutBtn?.classList.toggle("hide", !isIn);
+}
+(async () => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        applyAuthUI(session);
+    }
+    catch { /* ignore */ }
+})();
+supabase.auth.onAuthStateChange((_event, session) => applyAuthUI(session));
+logoutBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+        await supabase.auth.signOut();
+    }
+    finally {
+        location.reload();
+    }
+});
+/* (defensivo) Se ainda existir algum <h2> na seção principal, remove */
+(() => {
+    const title = document.querySelector("main section h2");
+    if (title)
+        title.remove();
+})();
 /* ===== Data (Supabase) ===== */
 async function listPublicServices() {
     const { data, error } = await supabase
@@ -55,7 +90,7 @@ function openDetailsModalPublic(svc) {
         try {
             document.body.removeChild(bd);
         }
-        catch { }
+        catch { /* noop */ }
     }
     function onKey(e) { if (e.key === "Escape")
         cleanup(); }
@@ -94,7 +129,7 @@ function openLightbox(images, startIndex = 0) {
         try {
             document.body.removeChild(bd);
         }
-        catch { }
+        catch { /* noop */ }
     }
     box.append(img);
     if (images.length > 1)
@@ -123,6 +158,10 @@ function card(svc) {
 }
 async function main() {
     const grid = document.getElementById("services-grid");
+    if (!grid)
+        return;
+    // garante classes de grid (caso o HTML não tenha)
+    grid.classList.add("grid");
     clear(grid);
     try {
         const services = await listPublicServices();

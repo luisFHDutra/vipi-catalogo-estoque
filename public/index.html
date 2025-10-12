@@ -5,24 +5,33 @@
     <meta charset="UTF-8" />
     <title>VIPI | Catálogo Público</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link href="styles/style.css" rel="stylesheet" />
+    <link href="styles/style-public.css" rel="stylesheet" />
 </head>
 
-<body>
-    <header class="topbar">
-        <div class="brand">
-            <img class="logo" src="./assets/logo-vipimatrizes.jpg" alt="VIPI Matrizes" />
-            <strong>Catálogo de Serviços</strong>
-        </div>
-        <nav>
-            <a href="./index.html">Catálogo</a>
-            <a href="./login.html">Login</a>
-        </nav>
+<body class="catalog-body">
+    <header class="navbar">
+        <a href="homepage.html" class="logo">
+            <img src="assets/logo-vipi-sem-fundo.png" alt="Logo VIPI Matrizes" />
+        </a>
+
+        <ul class="nav-links">
+            <li><a href="homepage.html">Início</a></li>
+            <li><a href="index.html" class="active">Catálogo</a></li>
+
+            <!-- Só aparecem quando logado -->
+            <li class="auth-only hide"><a href="admin.html#/servicos">Serviços</a></li>
+            <li class="auth-only hide"><a href="estoque.html">Estoque</a></li>
+
+            <!-- Entrar/Sair -->
+            <li><a href="homepage.html?login=1&next=./index.html" id="btn-login">Entrar</a></li>
+            <li><a href="#" id="btn-logout" class="hide">Sair</a></li>
+
+            <li><a href="https://wa.me/5551995424598" target="_blank">Contato</a></li>
+        </ul>
     </header>
 
     <main id="app">
         <section>
-            <h2>Serviços Públicos</h2>
             <div id="services-grid" class="grid"></div>
         </section>
     </main>

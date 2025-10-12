@@ -919,8 +919,49 @@ main {
 /* Grid de cards no admin */
 .admin-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
+}
+
+@media (max-width: 1200px) {
+    .admin-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .admin-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .admin-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.admin-body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+.admin-body main { flex: 1 0 auto; }
+.admin-body .footer { margin-top: auto; }
+
+/* Largura maior para caber 4 colunas com folga */
+.admin-body .page {
+    width: min(1280px, 95vw);
+}
+
+/* Grid com respiro e 4 colunas em telas largas */
+.admin-body .admin-grid {
+    gap: 24px; /* mais espaço entre os cards */
+}
+@media (min-width: 1200px) {
+    .admin-body .admin-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .card .muted {
@@ -954,7 +995,7 @@ main {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 50;
+    z-index: 2000;
 }
 
 .modal {
@@ -1009,6 +1050,10 @@ main {
 
 .modal-backdrop.show {
     display: flex;
+}
+
+.admin-body .modal { 
+    display: block !important; 
 }
 
 /* Dropdown no topo */

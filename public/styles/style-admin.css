@@ -1,0 +1,511 @@
+/* ===== VIPI Admin – CSS exclusivo da página admin.html ===== */
+
+/* Paleta */
+.admin-body {
+    --gap: 16px;
+    --bg: #ffffff;
+    --fg: #0b2240;
+    --muted: #667085;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(2, 6, 23, .08), 0 10px 20px rgba(2, 6, 23, .04);
+
+    --main: #003366;
+    /* azul VIPI */
+    --sec1: #006666;
+    /* teal VIPI */
+    --sec2: #000066;
+    /* azul escuro */
+    --ok: #0f766e;
+    /* teal ok */
+    --danger: #dc3545;
+}
+
+/* Reset leve e layout-base */
+.admin-body,
+.admin-body * {
+    box-sizing: border-box;
+}
+
+.admin-body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-body main {
+    flex: 1 0 auto;
+}
+
+.admin-body .footer {
+    margin-top: auto;
+    padding: 16px;
+    text-align: center;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+}
+
+/* ===== Topo no estilo da homepage (escopado) ===== */
+.admin-body .admin-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    padding: 15px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--sec2);
+    /* #000066 */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+}
+
+.admin-body .admin-nav .logo {
+    margin-right: 40px;
+}
+
+.admin-body .admin-nav .logo img {
+    height: 65px;
+    width: 170px;
+    display: block;
+}
+
+.admin-body .admin-nav .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+.admin-body .admin-nav .nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: .9rem;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 6px;
+    background: var(--sec2);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
+    transition: all .2s ease;
+}
+
+.admin-body .admin-nav .nav-links a:hover {
+    background: #00ccaa;
+    color: var(--main);
+    border-color: #00ccaa;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+
+/* ===== Wrapper e grid ===== */
+.admin-body .page {
+    width: min(1280px, 95vw);
+    margin: 24px auto;
+}
+
+.admin-body .admin-grid {
+    display: grid;
+    gap: 24px;
+    /* mais respiro entre cards */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+    .admin-body .admin-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .admin-body .admin-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .admin-body .admin-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Cards de serviço ===== */
+.admin-body .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.admin-body .card:hover {
+    transform: translateY(-2px);
+    border-color: #cfd4dc;
+    box-shadow: 0 8px 24px rgba(2, 6, 23, .08);
+}
+
+.admin-body .card h3 {
+    margin: 10px 0 4px 0;
+}
+
+.admin-body .card .muted {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.admin-body .img-cover {
+    width: 100%;
+    height: 160px;
+    object-fit: contain !important;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+/* Ações do card */
+.admin-body .admin-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+/* ===== Botões ===== */
+.admin-body .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--main);
+    background: var(--main);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter .15s ease, transform .1s ease;
+}
+
+.admin-body .btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+
+.admin-body .btn:active {
+    transform: translateY(0);
+}
+
+.admin-body .btn.ghost {
+    background: transparent;
+    color: var(--main);
+    border-color: var(--main);
+}
+
+.admin-body .btn.secondary {
+    background: var(--sec1);
+    border-color: var(--sec1);
+}
+
+.admin-body .btn.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+
+.admin-body .btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* ===== Formulários (cadastro/edição) ===== */
+.admin-body .form {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-body .form label {
+    font-weight: 600;
+    color: var(--main);
+    display: block;
+}
+
+.admin-body .form input[type="text"],
+.admin-body .form input[type="number"],
+.admin-body .form input[type="file"],
+.admin-body .form textarea,
+.admin-body .form select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--fg);
+    font-size: 14px;
+}
+
+.admin-body .form textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.admin-body .form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 720px) {
+    .admin-body .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.admin-body .form .note {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/* Thumbs (pré-visualização) */
+.admin-body .thumbs-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.admin-body .thumbs-row .thumb {
+    position: relative;
+}
+
+.admin-body .thumbs-row img {
+    width: 110px;
+    height: 74px;
+    object-fit: contain;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.admin-body .thumbs-row .rm {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    padding: 0;
+    display: grid;
+    place-items: center;
+}
+
+/* ===== Modal de detalhes (galeria) ===== */
+.admin-body .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    display: none;
+    /* ativado por .show */
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.admin-body .modal-backdrop.show {
+    display: flex;
+}
+
+.admin-body .modal {
+    background: #fff;
+    color: var(--fg);
+    border-radius: 12px;
+    width: min(680px, 92vw);
+    max-height: 88vh;
+    overflow: auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(2, 6, 23, .25);
+    transform: none !important;
+    /* neutraliza transforms de outros estilos */
+}
+
+.admin-body .modal header,
+.admin-body .modal footer {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-body .modal footer {
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    text-align: right;
+}
+
+.admin-body .modal .content {
+    padding: 16px;
+}
+
+.admin-body .modal h3 {
+    margin: 0;
+    color: var(--main);
+}
+
+.admin-body .kv {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.admin-body .kv .k {
+    font-weight: 700;
+    color: var(--sec2);
+}
+
+/* Galeria */
+.admin-body .carousel {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+.admin-body .carousel .frame {
+    width: 100%;
+    aspect-ratio: 16/10;
+    max-height: 60vh;
+    display: grid;
+    place-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.admin-body .carousel .img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+    cursor: zoom-in;
+}
+
+.admin-body .carousel .nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, .95);
+    border: 1px solid var(--border);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.admin-body .carousel .prev {
+    left: 8px;
+}
+
+.admin-body .carousel .next {
+    right: 8px;
+}
+
+.admin-body .carousel .nav:hover {
+    background: #fff;
+}
+
+/* Tabelas (se necessário no futuro) */
+.admin-body .table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-body .table th,
+.admin-body .table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+
+.admin-body .table th {
+    color: var(--sec2);
+}
+
+/* Tamanho padronizado, centralizado e SEM crop */
+.admin-body .card .img-cover {
+    display: block;
+    width: 100%;
+    height: 180px;
+    /* fallback */
+    object-fit: contain !important;
+    object-position: center center;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+@supports (aspect-ratio: 1) {
+    .admin-body .card .img-cover {
+        height: auto;
+        aspect-ratio: 16 / 10;
+        /* todos os thumbs no mesmo “formato” */
+    }
+}
+
+/* ============ GALERIA NO MODAL (admin) ============ */
+/* garante que a imagem do pop-up nunca corte e fique centralizada */
+.admin-body .modal .carousel {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+.admin-body .modal .carousel .frame {
+    width: 100%;
+    display: flex;
+    /* centraliza a imagem */
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    /* evita barras em imagens muito grandes */
+    max-height: 70vh;
+    /* limite seguro na viewport */
+}
+
+.admin-body .modal .carousel .img {
+    max-width: 100%;
+    max-height: 60vh;
+    /* ocupa bem sem estourar o frame */
+    width: auto;
+    height: auto;
+    object-fit: contain !important;
+    /* mostra a imagem inteira */
+    object-position: center center;
+    display: block;
+    background: #f8fafc;
+    /* “letterbox” claro quando sobrar espaço */
+}
+
+/* (opcional) reforço nos thumbs de pré-visualização do formulário */
+.admin-body .thumbs-row img {
+    object-fit: contain !important;
+    background: #f8fafc;
+}
+
+/* Centraliza o título do card de cadastro/edição */
+.admin-body .page>.card>h2 {
+    text-align: center;
+    margin: 0 0 16px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--sec2);
+}
