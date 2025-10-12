@@ -1,0 +1,380 @@
+/* Reset básico */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  color: #222;
+  line-height: 1.6;
+}
+
+/* Hero (cabeçalho com banner) */
+.hero {
+  height: 73vh;
+  background: linear-gradient(135deg, #003366, #006666);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar {
+  display: flex;
+  justify-content: center; /* Centraliza o conteúdo */
+  align-items: center;
+  padding: 15px 20px;
+  background: #000066;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  gap: 40px; /* espaço entre logo e botões */
+}
+
+.logo {
+  margin-right: 40px; /* Afasta a logo dos botões */
+}
+
+.logo img {
+  height: 65px;
+  width: 170px;
+  display: block;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 12px;
+  margin-right: 100px; /* empurra eles mais pra esquerda */
+  transform: translateX(-40px); /* Ajusta mais ainda pra esquerda */
+}
+
+
+.nav-links a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background-color: #000066;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.nav-links a:hover {
+  background-color: #00ccaa;
+  color: #003366;
+  border-color: #00ccaa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Hero content */
+.hero-content {
+  text-align: center;
+  margin: auto;
+  max-width: 500px;
+}
+
+.hero-content h2 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.hero-content h2 span {
+  color: #00ccaa;
+}
+
+.hero-content p {
+  font-size: 1rem;
+  margin-bottom: 30px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 25px;
+  background: #00ccaa;
+  color: #003366;
+  font-weight: bold;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.3s;
+}
+
+.btn:hover {
+  background: #006666;
+  color: #fff;
+}
+
+/* Serviços */
+.services {
+  padding: 60px 20px;
+  text-align: center;
+  background: #f5f5f5;
+}
+
+.services h2 {
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: #003366;
+}
+
+.cards {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  width: 280px;
+  transition: transform 0.3s;
+  border-top: 6px solid #006666;
+}
+
+.card:hover {
+  transform: translateY(-8px);
+}
+
+.card h3 {
+  margin-bottom: 10px;
+  color: #000066;
+}
+
+/* História */
+.history {
+  background: #f9f9f9;
+  padding: 60px 20px;
+}
+
+.history h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 30px;
+  color: #003366;
+  position: relative;
+}
+
+.history h2::after {
+  content: "";
+  display: block;
+  width: 80px;
+  height: 4px;
+  background: #006666;
+  margin: 10px auto 0;
+  border-radius: 2px;
+}
+
+.history p {
+  margin-bottom: 20px;
+  font-size: 1.05rem;
+  color: #333;
+  line-height: 1.8;
+}
+
+/* Rodapé */
+footer {
+  background: #000066;
+  color: #fff;
+  text-align: center;
+  padding: 15px;
+}
+
+/* Scroll suave */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Modal de login */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  width: 350px;
+  max-width: 90%;
+  text-align: center;
+  position: relative;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: #003366;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+
+/* Layout flexível da seção história */
+.container-history {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 50px; /* <-- AUMENTEI o espaçamento entre texto e imagem */
+  padding: 20px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+/* Texto centralizado */
+.text-history {
+  flex: 2;
+  text-align: justify;
+}
+
+/* Colunas de imagens com legendas */
+.img-lateral {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 150px; /* <-- Espaçamento entre imagens aumentado */
+  align-items: center;
+  padding: 0 30px; /* <-- Mais espaço dos lados */
+}
+
+.img-lateral figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.img-lateral img {
+  width: 130%;
+  max-width: 550px; /* <-- Imagem aumentada */
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  object-fit: cover;
+}
+
+.img-lateral figcaption {
+  margin-top: 10px;
+  font-size: 1.1rem;     /* <-- Fonte maior */
+  font-weight: bold;     /* <-- Negrito */
+  color: #333;
+  text-align: center;
+}
+
+/* Responsivo */
+@media (max-width: 1000px) {
+  .container-history {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .text-history {
+    order: 2;
+  }
+
+  .img-lateral {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    order: 1;
+    padding: 0;
+    gap: 30px;
+  }
+
+  .img-lateral img {
+    max-width: 200px;
+  }
+
+  .img-lateral figure {
+    margin: 0 10px;
+  }
+
+ /* Container do vídeo */
+.hero-video-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 40px auto 0 auto;  /* <-- aqui adiciona espaço em cima */
+  width: 100%;
+  padding-top: 20px;         /* <-- dá mais folga entre a barra e o vídeo */
+}
+
+/* Vídeo centralizado */
+.hero-video {
+  width: 80%;          /* controla o tamanho */
+  margin-top: 50px;    /* espaço da barra azul */
+  border: 5px solid #004ecc;  /* cor da borda (pode trocar) */
+  border-radius: 60px; /* deixa as quinas arredondadas */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); /* sombra pra destacar */
+}
+
+.maps {
+  padding: 80px 20px;  /* mais espaço em cima e embaixo */
+  background: linear-gradient(135deg, #003366, #006666); /* fundo estilizado */
+  text-align: center;
+  color: #fff;
+}
+
+.maps h2 {
+  font-size: 2.4rem;
+  font-weight: bold;
+  margin-bottom: 25px;
+  color: #00ccaa; /* cor que destaca do fundo */
+  text-shadow: 1px 1px 5px rgba(0,0,0,0.6);
+}
+
+.maps p {
+  font-size: 1.2rem;
+  max-width: 700px;
+  margin: 0 auto 35px auto; /* centralizado e com espaço pro mapa */
+  line-height: 1.8;
+}
+
+.map-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+
+.map-container iframe {
+  width: 100%;
+  height: 450px;
+  border: 0;
+}
+
+
+
+
+
+}
