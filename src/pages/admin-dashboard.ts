@@ -1,407 +1,944 @@
+// estoque.ts — versão integrada ao Supabase
+
 import { el, clear } from "../modules/ui.js";
+import type { Tool } from "../modules/types.js";
 import { supabase } from "../supabase/supabaseClient.js";
 
-supabase.auth.onAuthStateChange(
-  (event: string, session: any) => {
-    console.log("Evento:", event);
-    console.log("Sessão:", session);
-  }
-);
+// -----------------------------------------------------------------------------
+// Estado global (agora sincronizado com o Supabase)
+// -----------------------------------------------------------------------------
+let tools: Tool[] = []; // será preenchido via fetchTools()
+let searchTerm = "";
+let filterStatus: "all" | "low" | "ok" = "all";
+let sortBy: "name" | "quantity" | "location" = "name";
 
-/* ===== Tipos (alinha com o schema) ===== */
-type DBService = {
-  id: number;
-  created_at: string | null;
-  name: string;
-  description: string | null;
-  total_time: number | null;   // horas
-  price: number | null;        // R$
-  visibility: "public" | "private" | null;
-  notes: string | null;
-  images: string[] | null;     // json[] com URLs
-};
+// -----------------------------------------------------------------------------
+// Utilidades de UI
+// -----------------------------------------------------------------------------
+function showToast(
+  message: string,
+  type: "success" | "error" | "warning" | "info" = "success"
+) {
+  const container = document.getElementById("toast-container")!;
+  const toast = el("div", { classes: ["toast", type] });
 
-/* ===== Helpers ===== */
-const view = () => document.getElementById("view")!;
-const asNumber = (v: string | null) => {
-  if (!v) return null;
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-};
-const textOrNull = (t: string | null) => (!t || !t.trim()) ? null : t;
+  const icon =
+    type === "success"
+      ? "fas fa-check-circle"
+      : type === "error"
+      ? "fas fa-exclamation-circle"
+      : type === "warning"
+      ? "fas fa-exclamation-triangle"
+      : "fas fa-info-circle";
 
-const BUCKET = "service-images"; // Supabase Storage bucket (público)
+  const iconEl = el("i", { classes: icon.split(" ") });
+  const messageEl = el("span", { text: message });
 
-/** Upload múltiplo para o Storage -> retorna URLs públicas */
-async function uploadImages(files: FileList): Promise<string[]> {
-  const urls: string[] = [];
-  for (const file of Array.from(files)) {
-    const now = new Date();
-    const path = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}/${Date.now()}-${file.name}`;
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
-    if (upErr) throw upErr;
+  toast.appendChild(iconEl);
+  toast.appendChild(messageEl);
+  container.appendChild(toast);
 
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    if (!data?.publicUrl) throw new Error("Falha ao obter URL pública");
-    urls.push(data.publicUrl);
-  }
-  return urls;
+  setTimeout(() => {
+    toast.classList.add("slide-out");
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }
 
-/* ===== Router ===== */
-type Route = "#/servicos" | "#/novo" | `#/editar/${string}`;
-const currentRoute = (): Route => (window.location.hash || "#/servicos") as Route;
-const goto = (r: Route) => { if (window.location.hash !== r) window.location.hash = r; else render(); };
+function showModal(title: string, content: HTMLElement, onClose?: () => void) {
+  const container = document.getElementById("modal-container")!;
+  const modal = el("div", { classes: ["modal"] });
 
-/* ===== Navegação superior (estilo homepage) ===== */
-function setupTopNav() {
-  document.getElementById("nav-servicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
-  document.getElementById("nav-novo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); });
-  document.getElementById("nav-estoque")?.addEventListener("click", () => { /* link direto */ });
-  document.getElementById("nav-publico")?.addEventListener("click", () => { /* link direto */ });
-  document.getElementById("nav-sair")?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    await supabase.auth.signOut();
-    window.location.href = "./homepage.html";
+  const header = el("div", { classes: ["modal-header"] });
+  const titleEl = el("h3", { classes: ["modal-title"], text: title });
+  const closeBtn = el("button", {
+    classes: ["modal-close"],
+    attrs: { onclick: "closeModal()" },
   });
-}
+  closeBtn.innerHTML = "&times;";
 
-/* ===== CRUD (Supabase) ===== */
-async function listAllServices(): Promise<DBService[]> {
-  const { data, error } = await supabase
-    .from("service")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as DBService[];
-}
+  header.appendChild(titleEl);
+  header.appendChild(closeBtn);
 
-async function getServiceById(id: number): Promise<DBService | null> {
-  const { data, error } = await supabase
-    .from("service")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return (data ?? null) as DBService | null;
-}
+  modal.appendChild(header);
+  modal.appendChild(content);
 
-async function createService(payload: Omit<DBService, "id" | "created_at">) {
-  const { error } = await supabase.from("service").insert(payload);
-  if (error) throw error;
-}
+  container.appendChild(modal);
+  container.classList.add("active");
 
-async function updateService(id: number, payload: Partial<Omit<DBService, "id" | "created_at">>) {
-  const { error } = await supabase.from("service").update(payload).eq("id", id);
-  if (error) throw error;
-}
-
-async function deleteService(id: number) {
-  const { error } = await supabase.from("service").delete().eq("id", id);
-  if (error) throw error;
-}
-
-/* ===== Views ===== */
-
-// LISTA
-async function renderList() {
-  const root = view();
-  clear(root);
-
-  const page = el("div", { classes: ["page"] });
-
-  const grid = el("div", { classes: ["admin-grid"] });
-  const items = await listAllServices();
-
-  items.forEach(svc => {
-    const card = el("div", { classes: ["card"] });
-
-    const cover = svc.images?.[0];
-    if (cover) {
-      const img = el("img", { attrs: { src: cover, alt: svc.name }, classes: ["img-cover"] });
-      card.append(img);
-    }
-
-    const title = el("h3", { text: svc.name });
-    const meta = el("p", {
-      classes: ["muted"],
-      text:
-        `${svc.visibility === "public" ? "Público" : "Privado"} • ` +
-        (svc.total_time != null ? `${svc.total_time} h` : "sem tempo") +
-        (svc.price != null ? ` • Valor: R$ ${Number(svc.price).toFixed(2)}` : "")
-    });
-
-    const actions = el("div", { classes: ["admin-actions"] });
-    const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
-    const btnToggle = el("button", { classes: ["btn", "secondary"], text: svc.visibility === "public" ? "Tornar Privado" : "Tornar Público" });
-    const btnDel = el("button", { classes: ["btn", "danger"], text: "Excluir" });
-
-    btnEdit.addEventListener("click", (e) => { e.stopPropagation(); goto(`#/editar/${svc.id}`); });
-    btnToggle.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const nextVis = svc.visibility === "public" ? "private" : "public";
-      await updateService(svc.id, { visibility: nextVis });
-      await renderList();
-    });
-    btnDel.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (confirm(`Excluir "${svc.name}"?`)) { await deleteService(svc.id); await renderList(); }
-    });
-
-    actions.append(btnEdit, btnToggle, btnDel);
-    card.append(title, meta, actions);
-
-    card.addEventListener("click", () => openDetailsModal(svc));
-    grid.append(card);
-  });
-
-  page.append(grid);
-  root.append(page);
-}
-
-// FORM (novo/editar) — com upload no Storage
-function renderForm(existing?: DBService) {
-  const root = view();
-  clear(root);
-
-  const page = el("div", { classes: ["page"] });
-  const box = el("div", { classes: ["card"] });
-  box.append(el("h2", { text: existing ? "Editar Serviço" : "Cadastrar Serviço" }));
-
-  const form = el("form", { classes: ["form"] });
-
-  const fldName = el("input", { attrs: { id: "fName", required: "true", type: "text", placeholder: "Nome do serviço *" } }) as HTMLInputElement;
-  const fldDesc = el("textarea", { attrs: { id: "fDesc", placeholder: "Descrição / Detalhes técnicos" } }) as HTMLTextAreaElement;
-
-  const row1 = el("div", { classes: ["form-row"] });
-  const fldHours = el("input", { attrs: { id: "fHours", type: "number", min: "0", step: "0.25", placeholder: "Tempo total (horas)" } }) as HTMLInputElement;
-  const fldValue = el("input", { attrs: { id: "fValue", type: "number", min: "0", step: "0.01", placeholder: "Valor cobrado (R$)" } }) as HTMLInputElement;
-  row1.append(
-    wrap("Tempo total (h)", fldHours, "Use horas decimais. Ex.: 1.5 = 1h30."),
-    wrap("Valor cobrado (R$)", fldValue)
-  );
-
-  const row2 = el("div", { classes: ["form-row"] });
-  const selVis = el("select", { attrs: { id: "fVis" } }) as HTMLSelectElement;
-  selVis.append(new Option("Privado", "private"), new Option("Público", "public"));
-  const fldImgs = el("input", { attrs: { id: "fImgs", type: "file", accept: "image/*", multiple: "true" } }) as HTMLInputElement;
-  row2.append(wrap("Visibilidade", selVis), wrap("Imagens (múltiplas)", fldImgs, "Você pode selecionar várias fotos."));
-
-  const imagesBox = el("div");
-  imagesBox.style.marginTop = "6px";
-
-  const fldNotes = el("textarea", { attrs: { id: "fNotes", placeholder: "Notas internas (texto ou JSON como string)" } }) as HTMLTextAreaElement;
-
-  const bar = el("div");
-  const btnSave = el("button", { classes: ["btn"], text: "Salvar" });
-  const btnCancel = el("button", { classes: ["btn", "ghost"], text: "Cancelar" });
-  bar.append(btnSave, btnCancel);
-
-  form.append(
-    wrap("Nome do serviço *", fldName),
-    wrap("Descrição", fldDesc),
-    row1,
-    row2,
-    imagesBox,
-    wrap("Notas internas", fldNotes, "Conteúdo é salvo como texto (pode conter JSON)."),
-    bar,
-    el("p", { classes: ["note"], text: "Tempo/valor não aparecem no catálogo público." })
-  );
-
-  // Estado UI (pré-visualização). Não persiste localmente, apenas mostra o que será gravado no DB.
-  let currentImages: string[] = existing?.images?.slice() ?? [];
-
-  function refreshThumbs() {
-    imagesBox.innerHTML = "";
-    if (!currentImages.length) return;
-
-    const row = el("div", { classes: ["thumbs-row"] });
-    currentImages.forEach((url, idx) => {
-      const box = el("div", { classes: ["thumb"] });
-      const img = el("img", { attrs: { src: url, alt: `img-${idx}` } }) as HTMLImageElement;
-
-      const rm = el("button", { classes: ["btn", "danger", "rm"], text: "×" }) as HTMLButtonElement;
-      rm.addEventListener("click", (e) => {
-        e.preventDefault();
-        currentImages.splice(idx, 1);
-        refreshThumbs();
-      });
-
-      box.append(img, rm);
-      row.append(box);
-    });
-    imagesBox.append(row);
-  }
-
-  // Preencher se edição
-  let editingId: number | null = null;
-  if (existing) {
-    editingId = existing.id;
-    fldName.value = existing.name ?? "";
-    fldDesc.value = existing.description ?? "";
-    fldHours.value = existing.total_time != null ? String(existing.total_time) : "";
-    fldValue.value = existing.price != null ? String(existing.price) : "";
-    selVis.value = existing.visibility ?? "private";
-    fldNotes.value = existing.notes ?? "";
-  }
-  refreshThumbs();
-
-  form.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-
-    const payload: Omit<DBService, "id" | "created_at"> = {
-      name: fldName.value.trim(),
-      description: textOrNull(fldDesc.value),
-      total_time: asNumber(fldHours.value),
-      price: asNumber(fldValue.value),
-      visibility: (selVis.value as "public" | "private") || "private",
-      notes: textOrNull(fldNotes.value),
-      images: currentImages.slice(),
-    };
-    if (!payload.name) { alert("Nome é obrigatório."); return; }
-
-    // Upload para o Storage e gravação dos URLs no DB
-    const files = fldImgs.files;
-    if (files && files.length > 0) {
-      try {
-        const newUrls = await uploadImages(files);
-        payload.images = [...(payload.images ?? []), ...newUrls];
-      } catch (e: any) {
-        alert("Falha no upload de imagens: " + (e?.message ?? e));
-        return;
-      }
-    }
-
-    try {
-      if (editingId == null) await createService(payload);
-      else await updateService(editingId, payload);
-      goto("#/servicos");
-    } catch (e: any) {
-      alert("Erro ao salvar no Supabase: " + (e?.message ?? e));
-    }
-  });
-
-  btnCancel.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
-
-  box.append(form);
-  page.append(box);
-  root.append(page);
-
-  function wrap(label: string, field: HTMLElement, help?: string) {
-    const w = el("label");
-    w.append(el("span", { text: label }));
-    w.append(field);
-    if (help) w.append(el("div", { classes: ["note"], text: help }));
-    return w;
-  }
-}
-
-// MODAL de detalhes com galeria simples
-function openDetailsModal(svc: DBService) {
-  const bd = el("div", { classes: ["modal-backdrop", "show"] });
-  const m = el("div", { classes: ["modal"] });
-
-  const head = el("header");
-  head.append(el("h3", { text: svc.name }));
-
-  const content = el("div", { classes: ["content"] });
-
-  // galeria (somente URLs do DB)
-  const imgs = (svc.images ?? []) as string[];
-  let idx = 0;
-  if (imgs.length) {
-    const gallery = el("div", { classes: ["carousel"] });
-    const frame = el("div", { classes: ["frame"] });
-    const main = el("img", { classes: ["img"], attrs: { src: imgs[0], alt: svc.name } }) as HTMLImageElement;
-
-    function setIndex(i: number) {
-      if (!imgs.length) return;
-      idx = (i + imgs.length) % imgs.length;
-      main.src = imgs[idx];
-    }
-
-    const prev = el("div", { classes: ["nav", "prev"], text: "‹" });
-    const next = el("div", { classes: ["nav", "next"], text: "›" });
-    prev.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx - 1); });
-    next.addEventListener("click", (e) => { e.stopPropagation(); setIndex(idx + 1); });
-
-    frame.append(main);
-    gallery.append(frame);
-    if (imgs.length > 1) gallery.append(prev, next);
-    content.append(gallery);
-  }
-
-  // metadados
-  const kv = (k: string, v: string) => {
-    const row = el("div", { classes: ["kv"] });
-    row.append(el("div", { classes: ["k"], text: k }), el("div", { text: v }));
-    return row;
+  (window as any).closeModal = function () {
+    container.classList.remove("active");
+    setTimeout(() => {
+      container.innerHTML = "";
+      if (onClose) onClose();
+    }, 300);
   };
-  content.append(
-    kv("Visibilidade", svc.visibility === "public" ? "Público" : "Privado"),
-    kv("Tempo total", svc.total_time != null ? `${svc.total_time} h` : "—"),
-    kv("Valor cobrado", svc.price != null ? `R$ ${Number(svc.price).toFixed(2)}` : "—"),
-    kv("Criado em", svc.created_at ? new Date(svc.created_at).toLocaleString() : "—"),
-  );
-
-  if (svc.description) {
-    content.append(el("h4", { text: "Descrição" }), el("p", { text: svc.description }));
-  }
-  if (svc.notes) {
-    content.append(el("h4", { text: "Notas" }));
-    const pre = el("pre"); pre.textContent = svc.notes;
-    content.append(pre);
-  }
-
-  const foot = el("footer");
-  const btnEdit = el("button", { classes: ["btn", "ghost"], text: "Editar" });
-  const btnClose = el("button", { classes: ["btn"], text: "Fechar" });
-  btnEdit.addEventListener("click", () => { document.body.removeChild(bd); goto(`#/editar/${svc.id}`); });
-  btnClose.addEventListener("click", () => document.body.removeChild(bd));
-  foot.append(btnEdit, btnClose);
-
-  function onKey(e: KeyboardEvent) { if (e.key === "Escape") cleanup(); }
-  function cleanup() {
-    document.removeEventListener("keydown", onKey);
-    try { document.body.removeChild(bd); } catch { }
-  }
-
-  m.append(head, content, foot);
-  bd.append(m);
-  bd.addEventListener("click", (e) => { if (e.target === bd) cleanup(); });
-  document.addEventListener("keydown", onKey);
-  document.body.appendChild(bd);
 }
 
-/* ===== Auth (apenas Supabase) ===== */
-let isAuthenticated = false;
-async function ensureAuthenticated() {
-  if (isAuthenticated) return true;
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    // usa o login da homepage e abre modal automaticamente
-    window.location.href = `./homepage.html?login=1&next=./admin.html`;
-    return false;
+// -----------------------------------------------------------------------------
+// Data access — Supabase
+// -----------------------------------------------------------------------------
+async function fetchTools() {
+  const { data, error } = await supabase
+    .from("tool")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    showToast("Erro ao carregar ferramentas!", "error");
+    return;
   }
-  isAuthenticated = true;
-  return true;
+
+  // Mapeia para o tipo usado na UI (mantendo compat. com o tipo Tool do projeto)
+  tools = (data ?? []).map((t: any) => ({
+    id: String(t.id), // no DB é int8; mantemos string na UI para compatibilidade
+    name: t.name,
+    description: t.description ?? undefined,
+    quantity: Number(t.quantity ?? 0),
+    min_quantity: Number(t.min_quantity ?? 0),
+    location: t.location ?? undefined,
+    updated_at: t.created_at, // usamos created_at como referência de "atualização"
+  }));
+
+  renderEstoquePage();
 }
 
-/* ===== Render ===== */
-async function render() {
-  const authOk = await ensureAuthenticated();
-  if (!authOk) return;
-
-  const r = currentRoute();
-  if (r.startsWith("#/editar/")) {
-    const id = Number(r.split("/")[2]);
-    const svc = Number.isFinite(id) ? await getServiceById(id) : null;
-    return renderForm(svc ?? undefined);
-  }
-  if (r === "#/novo") return renderForm();
-  return renderList();
+// Realtime opcional (atualiza UI quando a tabela muda)
+function subscribeRealtime() {
+  supabase
+    .channel("tools-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "tool" },
+      () => {
+        fetchTools();
+      }
+    )
+    .subscribe();
 }
 
-window.addEventListener("hashchange", () => render());
-setupTopNav();
-render();
+// -----------------------------------------------------------------------------
+// Business logic (filtro/ordenação)
+// -----------------------------------------------------------------------------
+function getFilteredAndSortedTools(): Tool[] {
+  let filtered = tools.filter((tool) => {
+    const matchesSearch =
+      tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tool.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tool.location?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesFilter =
+      filterStatus === "all" ||
+      (filterStatus === "low" && tool.quantity <= tool.min_quantity) ||
+      (filterStatus === "ok" && tool.quantity > tool.min_quantity);
+
+    return matchesSearch && matchesFilter;
+  });
+
+  return filtered.sort((a, b) => {
+    switch (sortBy) {
+      case "name":
+        return a.name.localeCompare(b.name);
+      case "quantity":
+        return b.quantity - a.quantity;
+      case "location":
+        return (a.location || "").localeCompare(b.location || "");
+      default:
+        return 0;
+    }
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Renderização
+// -----------------------------------------------------------------------------
+function renderEstoquePage() {
+  const content = document.getElementById("content")!;
+  clear(content);
+
+  renderQuickStats();
+  renderSearchAndFilters();
+  renderToolsList();
+}
+
+function renderQuickStats() {
+  const content = document.getElementById("content")!;
+
+  const statsCard = el("div", { classes: ["card", "modern-card"] });
+  const statsTitle = el("h3", {
+    text: "📊 Resumo do Estoque",
+    attrs: {
+      style:
+        "margin-bottom: 20px; display: flex; align-items: center; gap: 12px;",
+    },
+  });
+
+  const totalTools = tools.length;
+  const lowStockTools = tools.filter((t) => t.quantity <= t.min_quantity).length;
+  const totalQuantity = tools.reduce((sum, t) => sum + t.quantity, 0);
+  const avgQuantity = totalTools > 0 ? Math.round(totalQuantity / totalTools) : 0;
+
+  const statsGrid = el("div", {
+    classes: ["grid"],
+    attrs: {
+      style:
+        "grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;",
+    },
+  });
+
+  const totalCard = el("div", { classes: ["stats-card"] });
+  const totalIcon = el("i", {
+    classes: ["fas", "fa-tools"],
+    attrs: {
+      style:
+        "font-size: 2rem; color: var(--primary); margin-bottom: 10px;",
+    },
+  });
+  const totalLabel = el("p", {
+    text: "Ferramentas",
+    attrs: { style: "margin: 0; color: var(--muted); font-size: 0.9rem;" },
+  });
+  const totalValue = el("h4", {
+    text: totalTools.toString(),
+    attrs: {
+      style:
+        "color: var(--primary); margin: 8px 0; font-size: 2.5rem; font-weight: 700;",
+    },
+  });
+  totalCard.appendChild(totalIcon);
+  totalCard.appendChild(totalLabel);
+  totalCard.appendChild(totalValue);
+
+  const lowStockCard = el("div", { classes: ["stats-card"] });
+  const lowStockIcon = el("i", {
+    classes: ["fas", "fa-exclamation-triangle"],
+    attrs: {
+      style:
+        "font-size: 2rem; color: var(--warning); margin-bottom: 10px;",
+    },
+  });
+  const lowStockLabel = el("p", {
+    text: "Estoque Baixo",
+    attrs: { style: "margin: 0; color: var(--muted); font-size: 0.9rem;" },
+  });
+  const lowStockValue = el("h4", {
+    text: lowStockTools.toString(),
+    attrs: {
+      style: `color: ${
+        lowStockTools > 0 ? "var(--warning)" : "var(--success)"
+      }; margin: 8px 0; font-size: 2.5rem; font-weight: 700;`,
+    },
+  });
+  lowStockCard.appendChild(lowStockIcon);
+  lowStockCard.appendChild(lowStockLabel);
+  lowStockCard.appendChild(lowStockValue);
+
+  const itemsCard = el("div", { classes: ["stats-card"] });
+  const itemsIcon = el("i", {
+    classes: ["fas", "fa-boxes"],
+    attrs: {
+      style: "font-size: 2rem; color: var(--info); margin-bottom: 10px;",
+    },
+  });
+  const itemsLabel = el("p", {
+    text: "Total de Itens",
+    attrs: { style: "margin: 0; color: var(--muted); font-size: 0.9rem;" },
+  });
+  const itemsValue = el("h4", {
+    text: totalQuantity.toString(),
+    attrs: {
+      style:
+        "color: var(--info); margin: 8px 0; font-size: 2.5rem; font-weight: 700;",
+    },
+  });
+  itemsCard.appendChild(itemsIcon);
+  itemsCard.appendChild(itemsLabel);
+  itemsCard.appendChild(itemsValue);
+
+  const avgCard = el("div", { classes: ["stats-card"] });
+  const avgIcon = el("i", {
+    classes: ["fas", "fa-chart-line"],
+    attrs: {
+      style: "font-size: 2rem; color: var(--success); margin-bottom: 10px;",
+    },
+  });
+  const avgLabel = el("p", {
+    text: "Média por Item",
+    attrs: { style: "margin: 0; color: var(--muted); font-size: 0.9rem;" },
+  });
+  const avgValue = el("h4", {
+    text: avgQuantity.toString(),
+    attrs: {
+      style:
+        "color: var(--success); margin: 8px 0; font-size: 2.5rem; font-weight: 700;",
+    },
+  });
+  avgCard.appendChild(avgIcon);
+  avgCard.appendChild(avgLabel);
+  avgCard.appendChild(avgValue);
+
+  statsGrid.appendChild(totalCard);
+  statsGrid.appendChild(lowStockCard);
+  statsGrid.appendChild(itemsCard);
+  statsGrid.appendChild(avgCard);
+
+  statsCard.appendChild(statsTitle);
+  statsCard.appendChild(statsGrid);
+  content.appendChild(statsCard);
+}
+
+function renderSearchAndFilters() {
+  const content = document.getElementById("content")!;
+
+  const searchCard = el("div", { classes: ["card", "modern-card"] });
+  const searchTitle = el("h3", {
+    text: "🔍 Buscar e Filtrar",
+    attrs: {
+      style:
+        "margin-bottom: 20px; display: flex; align-items: center; gap: 12px;",
+    },
+  });
+
+  const searchContainer = el("div", { classes: ["search-container"] });
+
+  const searchInput = el("input", {
+    classes: ["search-input"],
+    attrs: {
+      type: "text",
+      placeholder: "Buscar por nome, descrição ou localização...",
+      value: searchTerm,
+      oninput: "handleSearch(this.value)",
+    },
+  });
+
+  const filterSelect = el("select", {
+    classes: ["filter-select"],
+    attrs: {
+      value: filterStatus,
+      onchange: "handleFilter(this.value)",
+    },
+  });
+
+  const allOption = el("option", { text: "Todos os itens", attrs: { value: "all" } });
+  const lowOption = el("option", { text: "Estoque baixo", attrs: { value: "low" } });
+  const okOption = el("option", { text: "Estoque OK", attrs: { value: "ok" } });
+
+  filterSelect.appendChild(allOption);
+  filterSelect.appendChild(lowOption);
+  filterSelect.appendChild(okOption);
+
+  const sortSelect = el("select", {
+    classes: ["filter-select"],
+    attrs: {
+      value: sortBy,
+      onchange: "handleSort(this.value)",
+    },
+  });
+
+  const sortNameOption = el("option", {
+    text: "Ordenar por nome",
+    attrs: { value: "name" },
+  });
+  const sortQuantityOption = el("option", {
+    text: "Ordenar por quantidade",
+    attrs: { value: "quantity" },
+  });
+  const sortLocationOption = el("option", {
+    text: "Ordenar por localização",
+    attrs: { value: "location" },
+  });
+
+  sortSelect.appendChild(sortNameOption);
+  sortSelect.appendChild(sortQuantityOption);
+  sortSelect.appendChild(sortLocationOption);
+
+  const actionsContainer = el("div", {
+    attrs: {
+      style:
+        "display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;",
+    },
+  });
+
+  const addButton = el("button", {
+    classes: ["btn", "btn-primary"],
+    attrs: { onclick: "showAddToolModal()" },
+  });
+  addButton.innerHTML = '<i class="fas fa-plus"></i> Nova Ferramenta';
+
+  const reportButton = el("button", {
+    classes: ["btn", "btn-secondary"],
+    attrs: { onclick: "showDetailedReport()" },
+  });
+  reportButton.innerHTML = '<i class="fas fa-chart-bar"></i> Relatório';
+
+  const exportButton = el("button", {
+    classes: ["btn", "btn-success"],
+    attrs: { onclick: "exportStockData()" },
+  });
+  exportButton.innerHTML = '<i class="fas fa-download"></i> Exportar';
+
+  actionsContainer.appendChild(addButton);
+  actionsContainer.appendChild(reportButton);
+  actionsContainer.appendChild(exportButton);
+
+  searchContainer.appendChild(searchInput);
+  searchContainer.appendChild(filterSelect);
+  searchContainer.appendChild(sortSelect);
+
+  searchCard.appendChild(searchTitle);
+  searchCard.appendChild(searchContainer);
+  searchCard.appendChild(actionsContainer);
+  content.appendChild(searchCard);
+
+  (window as any).handleSearch = function (value: string) {
+    searchTerm = value;
+    renderToolsList();
+  };
+
+  (window as any).handleFilter = function (value: string) {
+    filterStatus = value as typeof filterStatus;
+    renderToolsList();
+  };
+
+  (window as any).handleSort = function (value: string) {
+    sortBy = value as typeof sortBy;
+    renderToolsList();
+  };
+}
+
+function renderToolsList() {
+  const content = document.getElementById("content")!;
+
+  const existingList = document.getElementById("tools-list");
+  if (existingList) existingList.remove();
+
+  const toolsCard = el("div", {
+    classes: ["card", "modern-card"],
+    attrs: { id: "tools-list" },
+  });
+
+  const filteredTools = getFilteredAndSortedTools();
+
+  const toolsTitle = el("h3", {
+    text: "🔧 Ferramentas em Estoque",
+    attrs: {
+      style:
+        "margin-bottom: 20px; display: flex; align-items: center; gap: 12px;",
+    },
+  });
+  const toolsCount = el("p", {
+    text: `${filteredTools.length} de ${tools.length} ferramentas`,
+    attrs: { style: "color: var(--muted); margin-bottom: 20px;" },
+  });
+
+  toolsCard.appendChild(toolsTitle);
+  toolsCard.appendChild(toolsCount);
+
+  if (filteredTools.length === 0) {
+    const emptyMsg = el("div", {
+      attrs: {
+        style:
+          "text-align: center; padding: 60px 20px; color: var(--muted);",
+      },
+    });
+    const emptyIcon = el("i", {
+      classes: ["fas", "fa-search"],
+      attrs: { style: "font-size: 4rem; margin-bottom: 20px; opacity: 0.5;" },
+    });
+    const emptyText = el("h4", {
+      text: "Nenhuma ferramenta encontrada",
+      attrs: { style: "margin: 0 0 10px 0;" },
+    });
+    const emptySubtext = el("p", {
+      text: "Tente ajustar os filtros de busca ou adicione uma nova ferramenta.",
+      attrs: { style: "margin: 0;" },
+    });
+
+    emptyMsg.appendChild(emptyIcon);
+    emptyMsg.appendChild(emptyText);
+    emptyMsg.appendChild(emptySubtext);
+    toolsCard.appendChild(emptyMsg);
+  } else {
+    const toolsGrid = el("div", {
+      classes: ["grid"],
+      attrs: {
+        style:
+          "grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;",
+      },
+    });
+
+    filteredTools.forEach((tool) => {
+      const toolCard = createToolCard(tool);
+      toolsGrid.appendChild(toolCard);
+    });
+
+    toolsCard.appendChild(toolsGrid);
+  }
+
+  content.appendChild(toolsCard);
+}
+
+function createToolCard(tool: Tool): HTMLElement {
+  const card = el("div", { classes: ["tool-card"] });
+
+  const isLowStock = tool.quantity <= tool.min_quantity;
+  const statusClass = isLowStock ? "warning" : "success";
+  const statusText = isLowStock ? "Estoque Baixo" : "Em Estoque";
+  const statusIcon = isLowStock ? ["fas", "fa-exclamation-triangle"] : ["fas", "fa-check-circle"];
+
+  const cardHeader = el("div", {
+    attrs: {
+      style:
+        "display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;",
+    },
+  });
+  const title = el("h4", {
+    text: tool.name,
+    attrs: { style: "margin: 0; font-size: 1.2rem; font-weight: 600;" },
+  });
+  const statusBadge = el("div", { classes: ["status-badge", statusClass] });
+  statusBadge.innerHTML = `<i class="${statusIcon.join(" ")}"></i> ${statusText}`;
+
+  cardHeader.appendChild(title);
+  cardHeader.appendChild(statusBadge);
+
+  const description = el("p", {
+    text: tool.description || "Sem descrição",
+    attrs: { style: "color: var(--muted); margin: 0 0 16px 0; font-size: 0.9rem;" },
+  });
+
+  const stockInfo = el("div", {
+    attrs: {
+      style:
+        "background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 16px; margin-bottom: 16px;",
+    },
+  });
+
+  const quantityDiv = el("div", {
+    attrs: {
+      style:
+        "display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;",
+    },
+  });
+  const quantityLabel = el("span", { text: "Quantidade:", attrs: { style: "color: var(--muted);" } });
+  const quantityValue = el("span", {
+    text: String(tool.quantity),
+    attrs: {
+      style: `color: ${isLowStock ? "var(--warning)" : "var(--success)"}; font-weight: 700; font-size: 1.1rem;`,
+    },
+  });
+  quantityDiv.appendChild(quantityLabel);
+  quantityDiv.appendChild(quantityValue);
+
+  const minDiv = el("div", {
+    attrs: {
+      style:
+        "display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;",
+    },
+  });
+  const minLabel = el("span", { text: "Mínimo:", attrs: { style: "color: var(--muted);" } });
+  const minValue = el("span", { text: String(tool.min_quantity), attrs: { style: "color: var(--fg);" } });
+  minDiv.appendChild(minLabel);
+  minDiv.appendChild(minValue);
+
+  const locationDiv = el("div", {
+    attrs: { style: "display: flex; justify-content: space-between; align-items: center;" },
+  });
+  const locationLabel = el("span", { text: "Local:", attrs: { style: "color: var(--muted);" } });
+  const locationValue = el("span", {
+    text: tool.location || "Não informado",
+    attrs: { style: "color: var(--fg);" },
+  });
+  locationDiv.appendChild(locationLabel);
+  locationDiv.appendChild(locationValue);
+
+  stockInfo.appendChild(quantityDiv);
+  stockInfo.appendChild(minDiv);
+  stockInfo.appendChild(locationDiv);
+
+  const buttonsDiv = el("div", { attrs: { style: "display: flex; gap: 8px;" } });
+  const editButton = el("button", {
+    classes: ["btn", "btn-secondary", "btn-sm"],
+    attrs: { onclick: `editTool('${tool.id}')` },
+  });
+  editButton.innerHTML = '<i class="fas fa-edit"></i> Editar';
+
+  const deleteButton = el("button", {
+    classes: ["btn", "btn-danger", "btn-sm"],
+    attrs: { onclick: `deleteTool('${tool.id}')` },
+  });
+  deleteButton.innerHTML = '<i class="fas fa-trash"></i> Excluir';
+
+  buttonsDiv.appendChild(editButton);
+  buttonsDiv.appendChild(deleteButton);
+
+  card.appendChild(cardHeader);
+  card.appendChild(description);
+  card.appendChild(stockInfo);
+  card.appendChild(buttonsDiv);
+
+  return card;
+}
+
+// -----------------------------------------------------------------------------
+// Ações globais (CRUD) — agora via Supabase
+// -----------------------------------------------------------------------------
+(window as any).showAddToolModal = function () {
+  const formContent = el("form", {
+    classes: ["form"],
+    attrs: { onsubmit: "handleAddTool(event)" },
+  });
+
+  const nameInput = el("input", {
+    attrs: { type: "text", name: "name", placeholder: "Nome da ferramenta", required: "true" },
+  });
+
+  const descTextarea = el("textarea", {
+    attrs: { name: "description", placeholder: "Descrição (opcional)", rows: "3" },
+  });
+
+  const quantityInput = el("input", {
+    attrs: { type: "number", name: "quantity", placeholder: "Quantidade atual", min: "0", required: "true" },
+  });
+
+  const minQuantityInput = el("input", {
+    attrs: { type: "number", name: "min_quantity", placeholder: "Quantidade mínima", min: "0", required: "true" },
+  });
+
+  const locationInput = el("input", {
+    attrs: { type: "text", name: "location", placeholder: "Localização (opcional)" },
+  });
+
+  const buttonsDiv = el("div", { attrs: { style: "display: flex; gap: 12px; margin-top: 20px;" } });
+  const saveButton = el("button", { classes: ["btn", "btn-primary"], attrs: { type: "submit" } });
+  saveButton.innerHTML = '<i class="fas fa-save"></i> Salvar';
+
+  const cancelButton = el("button", {
+    classes: ["btn", "btn-secondary"],
+    attrs: { type: "button", onclick: "closeModal()" },
+  });
+  cancelButton.innerHTML = '<i class="fas fa-times"></i> Cancelar';
+
+  buttonsDiv.appendChild(saveButton);
+  buttonsDiv.appendChild(cancelButton);
+
+  formContent.appendChild(nameInput);
+  formContent.appendChild(descTextarea);
+  formContent.appendChild(quantityInput);
+  formContent.appendChild(minQuantityInput);
+  formContent.appendChild(locationInput);
+  formContent.appendChild(buttonsDiv);
+
+  showModal("➕ Nova Ferramenta", formContent);
+};
+
+(window as any).handleAddTool = async function (event: Event) {
+  event.preventDefault();
+  const form = event.target as HTMLFormElement;
+  const formData = new FormData(form);
+
+  const newTool = {
+    name: String(formData.get("name") || "").trim(),
+    description: (formData.get("description") as string) || null,
+    quantity: parseFloat(String(formData.get("quantity") || "0")),
+    min_quantity: parseFloat(String(formData.get("min_quantity") || "0")),
+    location: (formData.get("location") as string) || null,
+  };
+
+  const { error } = await supabase.from("tool").insert([newTool]);
+  if (error) {
+    console.error(error);
+    showToast("Erro ao adicionar ferramenta!", "error");
+    return;
+  }
+
+  (window as any).closeModal();
+  await fetchTools();
+  showToast("Ferramenta adicionada com sucesso!", "success");
+};
+
+(window as any).editTool = function (toolId: string) {
+  const tool = tools.find((t) => t.id === toolId);
+  if (!tool) return;
+
+  const formContent = el("form", {
+    classes: ["form"],
+    attrs: { onsubmit: "handleEditTool(event)" },
+  });
+
+  const nameInput = el("input", {
+    attrs: { type: "text", name: "name", value: tool.name, required: "true" },
+  });
+
+  const descTextarea = el("textarea", { attrs: { name: "description", rows: "3" } });
+  descTextarea.value = tool.description || "";
+
+  const quantityInput = el("input", {
+    attrs: { type: "number", name: "quantity", value: String(tool.quantity), min: "0", required: "true" },
+  });
+
+  const minQuantityInput = el("input", {
+    attrs: { type: "number", name: "min_quantity", value: String(tool.min_quantity), min: "0", required: "true" },
+  });
+
+  const locationInput = el("input", {
+    attrs: { type: "text", name: "location", value: tool.location || "" },
+  });
+
+  const hiddenId = el("input", {
+    attrs: { type: "hidden", name: "id", value: tool.id },
+  });
+
+  const buttonsDiv = el("div", { attrs: { style: "display: flex; gap: 12px; margin-top: 20px;" } });
+  const saveButton = el("button", { classes: ["btn", "btn-primary"], attrs: { type: "submit" } });
+  saveButton.innerHTML = '<i class="fas fa-save"></i> Salvar';
+
+  const cancelButton = el("button", {
+    classes: ["btn", "btn-secondary"],
+    attrs: { type: "button", onclick: "closeModal()" },
+  });
+  cancelButton.innerHTML = '<i class="fas fa-times"></i> Cancelar';
+
+  buttonsDiv.appendChild(saveButton);
+  buttonsDiv.appendChild(cancelButton);
+
+  formContent.appendChild(hiddenId);
+  formContent.appendChild(nameInput);
+  formContent.appendChild(descTextarea);
+  formContent.appendChild(quantityInput);
+  formContent.appendChild(minQuantityInput);
+  formContent.appendChild(locationInput);
+  formContent.appendChild(buttonsDiv);
+
+  showModal("✏️ Editar Ferramenta", formContent);
+
+  (window as any).handleEditTool = async function (event: Event) {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const formData = new FormData(form);
+
+    const id = String(formData.get("id") || "");
+    const updatedTool = {
+      name: String(formData.get("name") || "").trim(),
+      description: (formData.get("description") as string) || null,
+      quantity: parseFloat(String(formData.get("quantity") || "0")),
+      min_quantity: parseFloat(String(formData.get("min_quantity") || "0")),
+      location: (formData.get("location") as string) || null,
+    };
+
+    const { error } = await supabase.from("tool").update(updatedTool).eq("id", Number(id));
+    if (error) {
+      console.error(error);
+      showToast("Erro ao atualizar ferramenta!", "error");
+      return;
+    }
+
+    (window as any).closeModal();
+    await fetchTools();
+    showToast("Ferramenta atualizada com sucesso!", "success");
+  };
+};
+
+(window as any).deleteTool = function (toolId: string) {
+  const tool = tools.find((t) => t.id === toolId);
+  if (!tool) return;
+
+  const confirmContent = el("div", { attrs: { style: "text-align: center;" } });
+  const warningIcon = el("i", {
+    classes: ["fas", "fa-exclamation-triangle"],
+    attrs: { style: "font-size: 3rem; color: var(--warning); margin-bottom: 20px;" },
+  });
+  const confirmText = el("p", {
+    text: `Tem certeza que deseja excluir a ferramenta "${tool.name}"?`,
+    attrs: { style: "font-size: 1.1rem; margin-bottom: 30px;" },
+  });
+  const warningText = el("p", {
+    text: "Esta ação não pode ser desfeita.",
+    attrs: { style: "color: var(--muted); margin-bottom: 30px;" },
+  });
+
+  const buttonsDiv = el("div", { attrs: { style: "display: flex; gap: 12px; justify-content: center;" } });
+  const confirmButton = el("button", {
+    classes: ["btn", "btn-danger"],
+    attrs: { onclick: `confirmDelete('${toolId}')` },
+  });
+  confirmButton.innerHTML = '<i class="fas fa-trash"></i> Excluir';
+
+  const cancelButton = el("button", {
+    classes: ["btn", "btn-secondary"],
+    attrs: { onclick: "closeModal()" },
+  });
+  cancelButton.innerHTML = '<i class="fas fa-times"></i> Cancelar';
+
+  buttonsDiv.appendChild(confirmButton);
+  buttonsDiv.appendChild(cancelButton);
+
+  confirmContent.appendChild(warningIcon);
+  confirmContent.appendChild(confirmText);
+  confirmContent.appendChild(warningText);
+  confirmContent.appendChild(buttonsDiv);
+
+  showModal("🗑️ Confirmar Exclusão", confirmContent);
+
+  (window as any).confirmDelete = async function (id: string) {
+    const { error } = await supabase.from("tool").delete().eq("id", Number(id));
+    if (error) {
+      console.error(error);
+      showToast("Erro ao excluir ferramenta!", "error");
+      return;
+    }
+
+    (window as any).closeModal();
+    await fetchTools();
+    showToast("Ferramenta excluída com sucesso!", "success");
+  };
+};
+
+(window as any).showDetailedReport = function () {
+  const reportContent = el("div");
+
+  const totalTools = tools.length;
+  const lowStockTools = tools.filter((t) => t.quantity <= t.min_quantity).length;
+  const totalQuantity = tools.reduce((sum, t) => sum + t.quantity, 0);
+  const avgQuantity = totalTools > 0 ? Math.round(totalQuantity / totalTools) : 0;
+
+  const reportDate = el("p", {
+    text: `Gerado em: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`,
+    attrs: { style: "color: var(--muted); font-size: 0.9rem; margin-bottom: 20px;" },
+  });
+
+  const statsGrid = el("div", {
+    classes: ["grid"],
+    attrs: {
+      style:
+        "grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px;",
+    },
+  });
+
+  const stats = [
+    { label: "Total de Ferramentas", value: totalTools, icon: "fas fa-tools", color: "var(--primary)" },
+    {
+      label: "Estoque Baixo",
+      value: lowStockTools,
+      icon: "fas fa-exclamation-triangle",
+      color: lowStockTools > 0 ? "var(--warning)" : "var(--success)",
+    },
+    { label: "Total de Itens", value: totalQuantity, icon: "fas fa-boxes", color: "var(--info)" },
+    { label: "Média por Item", value: avgQuantity, icon: "fas fa-chart-line", color: "var(--success)" },
+  ];
+
+  stats.forEach((stat) => {
+    const statCard = el("div", {
+      classes: ["stats-card"],
+      attrs: { style: "text-align: center;" },
+    });
+    const statIcon = el("i", {
+      classes: stat.icon.split(" "),
+      attrs: { style: `font-size: 2rem; color: ${stat.color}; margin-bottom: 10px;` },
+    });
+    const statLabel = el("h4", {
+      text: stat.label,
+      attrs: { style: "margin: 0 0 8px 0; font-size: 1rem;" },
+    });
+    const statValue = el("p", {
+      text: stat.value.toString(),
+      attrs: { style: `font-size: 2em; color: ${stat.color}; font-weight: bold; margin: 0;` },
+    });
+    statCard.appendChild(statIcon);
+    statCard.appendChild(statLabel);
+    statCard.appendChild(statValue);
+    statsGrid.appendChild(statCard);
+  });
+
+  const lowStockSection = el("div", { attrs: { style: "margin-top: 30px;" } });
+  const lowStockTitle = el("h4", { text: "⚠️ Ferramentas com Estoque Baixo", attrs: { style: "margin-bottom: 16px;" } });
+  const lowStockList = el("div", { attrs: { id: "low-stock-details" } });
+
+  const lowStockToolsList = tools.filter((t) => t.quantity <= t.min_quantity);
+
+  if (lowStockToolsList.length === 0) {
+    const noAlerts = el("p", {
+      text: "✅ Todas as ferramentas estão com estoque adequado!",
+      attrs: {
+        style:
+          "color: var(--success); font-weight: bold; text-align: center; padding: 20px; background: rgba(40, 167, 69, 0.1); border-radius: 12px;",
+      },
+    });
+    lowStockList.appendChild(noAlerts);
+  } else {
+    lowStockToolsList.forEach((tool) => {
+      const alertItem = el("div", {
+        attrs: {
+          style:
+            "padding: 16px; border: 1px solid var(--warning); border-radius: 12px; margin: 10px 0; background: rgba(255, 193, 7, 0.1);",
+        },
+      });
+      const alertTitle = el("strong", { text: tool.name, attrs: { style: "color: var(--warning);" } });
+      const alertDetails = el("span", {
+        text: ` - ${tool.quantity}/${tool.min_quantity} unidades (${tool.location || "Local não informado"})`,
+      });
+      alertItem.appendChild(alertTitle);
+      alertItem.appendChild(alertDetails);
+      lowStockList.appendChild(alertItem);
+    });
+  }
+
+  lowStockSection.appendChild(lowStockTitle);
+  lowStockSection.appendChild(lowStockList);
+
+  reportContent.appendChild(reportDate);
+  reportContent.appendChild(statsGrid);
+  reportContent.appendChild(lowStockSection);
+
+  showModal("📊 Relatório Detalhado", reportContent);
+};
+
+(window as any).exportStockData = function () {
+  const data = {
+    exportDate: new Date().toISOString(),
+    totalTools: tools.length,
+    tools: tools.map((tool) => ({
+      nome: tool.name,
+      descricao: tool.description,
+      quantidade: tool.quantity,
+      minimo: tool.min_quantity,
+      localizacao: tool.location,
+      status: tool.quantity <= tool.min_quantity ? "Estoque Baixo" : "OK",
+    })),
+  };
+
+  const dataStr = JSON.stringify(data, null, 2);
+  const dataBlob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(dataBlob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `estoque-${new Date().toISOString().split("T")[0]}.json`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+  showToast("Dados exportados com sucesso!", "success");
+};
+
+// -----------------------------------------------------------------------------
+// Extras
+// -----------------------------------------------------------------------------
+function setupLogout() {
+  const btn = document.getElementById("logoutBtn");
+  if (!btn) return;
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    showToast("Logout realizado com sucesso!", "info");
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Inicialização
+// -----------------------------------------------------------------------------
+async function main() {
+  await fetchTools();
+  subscribeRealtime(); // opcional, mas útil
+  setupLogout();
+}
+
+main();

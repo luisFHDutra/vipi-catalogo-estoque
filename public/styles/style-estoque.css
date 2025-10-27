@@ -1,0 +1,263 @@
+/* ===== VIPI | Tela de Estoque ===== */
+.inventory-body,
+.inventory-body * {
+  box-sizing: border-box;
+}
+
+.inventory-body {
+  --gap: 16px;
+  --bg: #fff;
+  --fg: #222;
+  --muted: #667085;
+  --border: #e5e7eb;
+  --main: #003366; /* azul VIPI */
+  --sec1: #006666; /* teal */
+  --sec2: #000066; /* azul escuro */
+  --danger: #dc3545;
+  --success: #1a9b5d;
+
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== NAVBAR ===== */
+.inventory-body .navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background: var(--main);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+}
+
+.inventory-body .navbar h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.inventory-body .navbar .actions {
+  display: flex;
+  gap: 10px;
+}
+
+.inventory-body .navbar button {
+  background: #00ccaa;
+  color: var(--main);
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.inventory-body .navbar button:hover {
+  background: #00b89a;
+}
+
+/* ===== MAIN LAYOUT ===== */
+.inventory-body main {
+  padding: 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.inventory-body h2 {
+  color: var(--main);
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--sec1);
+  padding-bottom: 6px;
+}
+
+/* ===== GRID ===== */
+.inventory-body .grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .inventory-body .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .inventory-body .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .inventory-body .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== CARD ===== */
+.inventory-body .card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-top: 6px solid var(--sec1);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.inventory-body .card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .12);
+}
+
+.inventory-body .card h3 {
+  color: var(--sec2);
+  margin: 10px 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.inventory-body .card p {
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.3;
+  margin-bottom: 10px;
+}
+
+.inventory-body .card .stock-status {
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.inventory-body .card .stock-status.in-stock {
+  background: rgba(26, 155, 93, .1);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.inventory-body .card .stock-status.low-stock {
+  background: rgba(255, 193, 7, .1);
+  color: #b88600;
+  border: 1px solid #b88600;
+}
+
+.inventory-body .card .stock-status.out-of-stock {
+  background: rgba(220, 53, 69, .1);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.inventory-body .card .actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inventory-body .card .btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.inventory-body .card .btn.edit {
+  background: var(--main);
+  color: #fff;
+}
+
+.inventory-body .card .btn.edit:hover {
+  filter: brightness(1.1);
+}
+
+.inventory-body .card .btn.remove {
+  background: var(--danger);
+  color: #fff;
+}
+
+.inventory-body .card .btn.remove:hover {
+  filter: brightness(1.1);
+}
+
+/* ===== MODAL ===== */
+.inventory-body .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.inventory-body .modal-backdrop.show {
+  display: flex;
+}
+
+.inventory-body .modal {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  width: min(600px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+}
+
+.inventory-body .modal header,
+.inventory-body .modal footer {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inventory-body .modal footer {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  text-align: right;
+}
+
+.inventory-body .modal h3 {
+  margin: 0;
+  color: var(--main);
+}
+
+.inventory-body .modal .content {
+  padding: 16px;
+}
+
+.inventory-body .modal input,
+.inventory-body .modal select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+  font-size: .9rem;
+}
+
+/* ===== FOOTER ===== */
+.inventory-body .footer {
+  margin-top: auto;
+  background: var(--main);
+  color: #fff;
+  text-align: center;
+  padding: 14px;
+  font-size: .9rem;
+}
