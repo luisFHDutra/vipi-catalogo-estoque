@@ -1,263 +1,511 @@
-/* ===== VIPI | Tela de Estoque ===== */
-.inventory-body,
-.inventory-body * {
+/* ===== VIPI | ESTOQUE (CSS exclusivo) ===== */
+.stock-body,
+.stock-body * {
   box-sizing: border-box;
 }
 
-.inventory-body {
+.stock-body {
   --gap: 16px;
   --bg: #fff;
-  --fg: #222;
+  --fg: #0b2240;
   --muted: #667085;
+  --card: #fff;
   --border: #e5e7eb;
-  --main: #003366; /* azul VIPI */
-  --sec1: #006666; /* teal */
-  --sec2: #000066; /* azul escuro */
+  --shadow: 0 1px 3px rgba(2, 6, 23, .08), 0 10px 20px rgba(2, 6, 23, .04);
+  --main: #003366;
+  --sec1: #006666;
+  --sec2: #000066;
   --danger: #dc3545;
-  --success: #1a9b5d;
-
+  --ok: #0f766e;
+  --info: #000066;
+  --warning: #ffc107;
+  --success: #28a745;
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* ===== LIMPEZA DE LEGADOS (esconde menus/headers antigos se existirem) ===== */
+.stock-body .topbar,
+.stock-body .brand,
+.stock-body .page-header,
+.stock-body .menu,
+/* botão "Menu ▼" legado */
+.stock-body nav.simple-menu,
+/* listas de links injetadas */
+.stock-body .legacy-menu,
+.stock-body .legacy-links {
+  display: none !important;
+}
+
+.stock-body img.logo {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ===== NAVBAR ===== */
-.inventory-body .navbar {
+.stock-body .admin-nav {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 14px 24px;
-  background: var(--main);
-  color: #fff;
+  gap: 40px;
+  padding: 15px 20px;
   position: sticky;
   top: 0;
   z-index: 1000;
+  background: var(--sec2);
   box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
 }
 
-.inventory-body .navbar h1 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+.stock-body .admin-nav .logo {
+  margin-right: 40px;
 }
 
-.inventory-body .navbar .actions {
+.stock-body .admin-nav .logo img {
+  height: 65px;
+  width: 170px;
+  display: block;
+}
+
+.stock-body .admin-nav .nav-links {
+  list-style: none;
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
 }
 
-.inventory-body .navbar button {
-  background: #00ccaa;
-  color: var(--main);
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
+.stock-body .admin-nav .nav-links a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: .9rem;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 6px;
+  background: var(--sec2);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
   transition: all .2s ease;
 }
 
-.inventory-body .navbar button:hover {
-  background: #00b89a;
-}
-
-/* ===== MAIN LAYOUT ===== */
-.inventory-body main {
-  padding: 24px;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.inventory-body h2 {
+.stock-body .admin-nav .nav-links a:hover,
+.stock-body .admin-nav .nav-links a.active {
+  background: #00ccaa;
   color: var(--main);
-  font-size: 1.3rem;
-  margin-bottom: 16px;
-  border-bottom: 2px solid var(--sec1);
-  padding-bottom: 6px;
+  border-color: #00ccaa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
 }
 
-/* ===== GRID ===== */
-.inventory-body .grid {
+/* ===== LAYOUT ===== */
+.stock-body .page {
+  width: min(1280px, 95vw);
+  margin: 24px auto;
+  /* respiro lateral e inferior */
+  padding-top: 16px;
+  /* respiro abaixo da navbar */
+}
+
+.stock-body main {
+  flex: 1 0 auto;
+}
+
+.stock-body .footer {
+  margin-top: auto;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.stock-body #content {
   display: grid;
-  gap: 20px;
+  /* vira um grid simples */
+  gap: 28px;
+  /* espaço vertical entre os cards */
+}
+
+/* um pouco mais de respiro em telas largas (opcional) */
+@media (min-width: 1200px) {
+  .stock-body #content {
+    gap: 32px;
+  }
+}
+
+/* garante que ninguém “roube” o gap com margens herdadas */
+.stock-body #content>.card,
+.stock-body #content>.modern-card {
+  margin: 0;
+  /* reset de margem externa dos cards */
+}
+
+/* ===== GRID/CARDS ===== */
+.stock-body .grid {
+  display: grid;
+  gap: 24px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-@media (max-width: 1200px) {
-  .inventory-body .grid {
+@media (max-width:1200px) {
+  .stock-body .grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
-@media (max-width: 900px) {
-  .inventory-body .grid {
+
+@media (max-width:900px) {
+  .stock-body .grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (max-width: 600px) {
-  .inventory-body .grid {
+
+@media (max-width:600px) {
+  .stock-body .grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* ===== CARD ===== */
-.inventory-body .card {
-  background: #fff;
+.stock-body .card {
+  background: var(--card);
   border: 1px solid var(--border);
-  border-top: 6px solid var(--sec1);
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: transform .2s ease, box-shadow .2s ease;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 
-.inventory-body .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, .12);
+.stock-body .card:hover {
+  transform: translateY(-2px);
+  border-color: #cfd4dc;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, .08);
 }
 
-.inventory-body .card h3 {
-  color: var(--sec2);
-  margin: 10px 0 6px;
-  font-size: 1rem;
-  font-weight: 600;
+.stock-body .modern-card {
+  border-radius: 20px;
+  padding: calc(var(--gap)*1.5);
 }
 
-.inventory-body .card p {
-  color: var(--muted);
-  font-size: .9rem;
-  line-height: 1.3;
-  margin-bottom: 10px;
-}
-
-.inventory-body .card .stock-status {
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 6px;
+/* Stats */
+.stock-body .stats-card {
+  background: linear-gradient(135deg, #f8f9fb 0%, #ffffff 100%);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: calc(var(--gap)*1.5);
   text-align: center;
-  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: all .2s ease;
 }
 
-.inventory-body .card .stock-status.in-stock {
-  background: rgba(26, 155, 93, .1);
+.stock-body .stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(135deg, #006666, #28a745);
+}
+
+/* Form */
+.stock-body .form {
+  display: grid;
+  gap: 12px;
+}
+
+.stock-body .form input,
+.stock-body .form select,
+.stock-body .form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--fg);
+}
+
+/* Botões */
+.stock-body .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--main);
+  background: var(--main);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter .15s ease, transform .1s ease;
+}
+
+.stock-body .btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.stock-body .btn:active {
+  transform: translateY(0);
+}
+
+.stock-body .btn-secondary {
+  background: var(--sec1);
+  border-color: var(--sec1);
+}
+
+.stock-body .btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.stock-body .btn-success {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.stock-body .btn-sm {
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+/* Busca/Filtro */
+.stock-body .search-container {
+  display: flex;
+  gap: 12px;
+  margin-bottom: calc(var(--gap)*1.5);
+  flex-wrap: wrap;
+}
+
+.stock-body .search-input,
+.stock-body .filter-select {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fg);
+  font-size: .9rem;
+  transition: all .2s ease;
+}
+
+.stock-body .search-input:focus,
+.stock-body .filter-select:focus {
+  outline: none;
+  border-color: var(--main);
+  box-shadow: 0 0 0 3px rgba(0, 51, 102, .1);
+}
+
+/* Badges */
+.stock-body .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.stock-body .status-badge.success {
+  background: rgba(40, 167, 69, .18);
   color: var(--success);
   border: 1px solid var(--success);
 }
 
-.inventory-body .card .stock-status.low-stock {
-  background: rgba(255, 193, 7, .1);
+.stock-body .status-badge.warning {
+  background: rgba(255, 193, 7, .18);
   color: #b88600;
   border: 1px solid #b88600;
 }
 
-.inventory-body .card .stock-status.out-of-stock {
-  background: rgba(220, 53, 69, .1);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-}
-
-.inventory-body .card .actions {
+/* Toast */
+.stock-body .toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.inventory-body .card .btn {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all .15s ease;
+.stock-body .toast {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  color: var(--fg);
+  box-shadow: 0 8px 32px rgba(2, 6, 23, .2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 300px;
+  transform: translateX(100%);
+  animation: slideIn .3s ease forwards;
 }
 
-.inventory-body .card .btn.edit {
-  background: var(--main);
-  color: #fff;
+@keyframes slideIn {
+  to {
+    transform: translateX(0);
+  }
 }
 
-.inventory-body .card .btn.edit:hover {
-  filter: brightness(1.1);
+@keyframes slideOut {
+  to {
+    transform: translateX(100%);
+  }
 }
 
-.inventory-body .card .btn.remove {
-  background: var(--danger);
-  color: #fff;
+.stock-body .toast.slide-out {
+  animation: slideOut .3s ease forwards;
 }
 
-.inventory-body .card .btn.remove:hover {
-  filter: brightness(1.1);
-}
-
-/* ===== MODAL ===== */
-.inventory-body .modal-backdrop {
+/* Modal */
+.stock-body .modal-container {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .45);
-  display: none;
+  background: rgba(0, 0, 0, .7);
+  backdrop-filter: blur(8px);
+  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
-}
-.inventory-body .modal-backdrop.show {
-  display: flex;
+  z-index: 10000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all .3s ease;
 }
 
-.inventory-body .modal {
+.stock-body .modal-container.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.stock-body .modal {
   background: #fff;
-  border-radius: 10px;
   border: 1px solid var(--border);
-  width: min(600px, 90vw);
-  max-height: 85vh;
+  border-radius: 20px;
+  padding: calc(var(--gap)*2);
+  width: min(600px, 92vw);
+  max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+  box-shadow: 0 20px 60px rgba(2, 6, 23, .25);
+  transform: scale(.96);
+  transition: transform .3s ease;
 }
 
-.inventory-body .modal header,
-.inventory-body .modal footer {
-  padding: 14px 16px;
+.stock-body .modal-container.active .modal {
+  transform: scale(1);
+}
+
+.stock-body .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(var(--gap)*1.2);
+  padding-bottom: calc(var(--gap)*.8);
   border-bottom: 1px solid var(--border);
 }
 
-.inventory-body .modal footer {
-  border-top: 1px solid var(--border);
-  border-bottom: none;
-  text-align: right;
-}
-
-.inventory-body .modal h3 {
+.stock-body .modal-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #003366 0%, #000066 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0;
-  color: var(--main);
 }
 
-.inventory-body .modal .content {
-  padding: 16px;
+.stock-body .modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
 }
 
-.inventory-body .modal input,
-.inventory-body .modal select {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  margin-bottom: 12px;
-  font-size: .9rem;
+.stock-body .modal-close:hover {
+  background: rgba(220, 53, 69, .1);
+  color: var(--danger);
 }
 
-/* ===== FOOTER ===== */
-.inventory-body .footer {
-  margin-top: auto;
-  background: var(--main);
-  color: #fff;
+/* Responsivo */
+@media (max-width:768px) {
+  .stock-body .admin-nav {
+    gap: 16px;
+  }
+
+  .stock-body .admin-nav .logo {
+    margin-right: 10px;
+  }
+
+  .stock-body .admin-nav .nav-links {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stock-body .modal {
+    width: 95%;
+    padding: calc(var(--gap)*1.5);
+  }
+}
+
+.stock-body .card>h3,
+.stock-body .modern-card>h3 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* centraliza horizontalmente */
   text-align: center;
-  padding: 14px;
-  font-size: .9rem;
+  margin: 0 0 20px 0;
+  /* mantém o respiro inferior */
+}
+
+/* ====== "Buscar e Filtrar" ocupando toda a largura ====== */
+/* troca o flex por grid: campo de busca cresce, selects têm largura fixa */
+.stock-body .search-container {
+  display: grid !important;
+  grid-template-columns: 1fr minmax(180px, 240px) minmax(180px, 240px);
+  column-gap: 14px;
+  row-gap: 12px;
+  align-items: center;
+}
+
+/* o input realmente expande dentro da coluna 1fr */
+.stock-body .search-input {
+  min-width: 0;
+  /* permite expandir/encolher sem quebrar o grid */
+  width: 100%;
+}
+
+/* selects preenchem sua coluna (180–240px) */
+.stock-body .filter-select {
+  width: 100%;
+}
+
+/* linha dos botões logo abaixo, ocupando a largura toda */
+.stock-body .card .search-container+div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+/* responsivo: quebra em 2 colunas e depois 1 */
+@media (max-width: 1100px) {
+  .stock-body .search-container {
+    grid-template-columns: 1fr minmax(180px, 240px);
+  }
+}
+
+@media (max-width: 720px) {
+  .stock-body .search-container {
+    grid-template-columns: 1fr;
+  }
 }
