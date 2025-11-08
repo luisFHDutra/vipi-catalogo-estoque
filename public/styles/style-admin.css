@@ -102,6 +102,13 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
 }
 
+.admin-body .admin-nav .nav-links a.active {
+    background: #00ccaa;
+    color: var(--main);
+    border-color: #00ccaa;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+
 /* ===== Wrapper e grid ===== */
 .admin-body .page {
     width: min(1280px, 95vw);

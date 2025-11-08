@@ -17,11 +17,13 @@
             </a>
 
             <ul class="nav-links">
-                <li><a href="#">Início</a></li>
-                <li><a href="#" id="btn-login">Entrar</a></li>
-                <li><a href="index.html">Catálogo</a></li>
-                <li><a href="#servicos">Serviços</a></li>
-                <li><a href="https://wa.me/5551995424598" target="_blank">Contato</a></li>
+                <!-- ordem:entrar, catálogo, serviços, estoque, contato, sair -->
+                <li><a id="btn-login" href="#">Entrar</a></li>
+                <li><a id="nav-catalog" href="index.html">Catálogo</a></li>
+                <li><a id="nav-services" href="admin.html" class="hidden">Serviços</a></li>
+                <li><a id="nav-stock" href="estoque.html" class="hidden">Estoque</a></li>
+                <li><a id="nav-contact" href="https://wa.me/5551995424598" target="_blank">Contato</a></li>
+                <li><a id="btn-logout" href="#" class="hidden">Sair</a></li>
             </ul>
         </nav>
 
@@ -184,50 +186,110 @@
 
     <!-- Script do modal + login Supabase -->
     <script type="module">
-        import { supabase } from "./js/supabase/supabaseClient.js";
-
+        // -------------------- refs DOM --------------------
         const modal = document.getElementById("loginModal");
-        const btn = document.getElementById("btn-login");
-        const closeBtn = document.querySelector(".close");
+        const btnOpen = document.getElementById("btn-login");
+        const btnClose = document.querySelector(".close");
         const form = document.getElementById("loginForm");
         const email = document.getElementById("email");
         const password = document.getElementById("password");
+        const btnSubmit = form?.querySelector('button[type="submit"]');
 
-        const qs = new URLSearchParams(window.location.search);
-        const nextUrl = qs.get("next");
+        // itens do menu
+        const navServices = document.getElementById("nav-services");
+        const navStock = document.getElementById("nav-stock");
+        const btnLogin = document.getElementById("btn-login");
+        const btnLogout = document.getElementById("btn-logout");
 
-        function openModal(e) {
-            if (e) e.preventDefault();
-            modal.style.display = "flex";
+        // -------------------- carregar Supabase sob demanda --------------------
+        let _sb = null;
+        async function getSupabase() {
+            if (_sb) return _sb;
+            const mod = await import("./js/supabase/supabaseClient.js");
+            _sb = mod?.supabase;
+            if (!_sb) throw new Error("Supabase não carregado");
+            return _sb;
         }
+
+        // -------------------- abrir/fechar modal --------------------
+        function openModal(e) { e?.preventDefault(); modal.style.display = "flex"; }
         function closeModal() { modal.style.display = "none"; }
-
-        btn?.addEventListener("click", openModal);
-        closeBtn?.addEventListener("click", closeModal);
+        btnOpen?.addEventListener("click", openModal);
+        btnClose?.addEventListener("click", closeModal);
         window.addEventListener("click", (ev) => { if (ev.target === modal) closeModal(); });
+        window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeModal(); });
 
-        // abre automaticamente se vier de uma rota protegida
-        if (qs.get("login") === "1") openModal();
+        // -------------------- regra de exibição do menu (apenas sessão) --------------------
+        function applyMenu(logged) {
+            // Entrar/Sair
+            if (btnLogin) btnLogin.classList.toggle("hidden", !!logged);
+            if (btnLogout) btnLogout.classList.toggle("hidden", !logged);
 
-        // se já estiver logado e houver ?next=, redireciona
-        (async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session && nextUrl) window.location.href = nextUrl;
-        })();
+            // Se logou, mostra Serviços e Estoque; senão, esconde
+            if (navServices) navServices.classList.toggle("hidden", !logged);
+            if (navStock) navStock.classList.toggle("hidden", !logged);
+        }
 
+        async function updateMenuForCurrentSession() {
+            try {
+                const supabase = await getSupabase();
+                const { data: { session } } = await supabase.auth.getSession();
+                applyMenu(!!session);
+            } catch (err) {
+                console.error(err);
+                applyMenu(false);
+            }
+        }
+
+        // -------------------- login (submit do modal) --------------------
         form?.addEventListener("submit", async (e) => {
             e.preventDefault();
+
+            const original = btnSubmit?.textContent;
+            if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = "Entrando..."; }
+
             try {
+                const supabase = await getSupabase();
                 const { error } = await supabase.auth.signInWithPassword({
                     email: email.value.trim(),
                     password: password.value
                 });
                 if (error) throw error;
-                window.location.href = nextUrl || "./admin.html";
+
+                // sucesso: fecha modal e atualiza o menu (ficando na homepage)
+                closeModal();
+                await updateMenuForCurrentSession();
             } catch (err) {
+                console.error(err);
                 alert(err?.message || "Falha ao entrar");
+            } finally {
+                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = original || "Entrar"; }
             }
         });
+
+        // -------------------- logout --------------------
+        btnLogout?.addEventListener("click", async (e) => {
+            e.preventDefault();
+            try {
+                const supabase = await getSupabase();
+                await supabase.auth.signOut();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                // volta ao estado público sem redirecionar
+                applyMenu(false);
+            }
+        });
+
+        // -------------------- reagir a mudanças de sessão (login/logout/refresh) --------------------
+        getSupabase().then((sb) => {
+            sb.auth.onAuthStateChange(() => {
+                updateMenuForCurrentSession();
+            });
+        });
+
+        // -------------------- boot --------------------
+        updateMenuForCurrentSession();
     </script>
 </body>
 

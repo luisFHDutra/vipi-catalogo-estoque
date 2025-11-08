@@ -35,6 +35,15 @@ const goto = (r) => { if (window.location.hash !== r)
     window.location.hash = r;
 else
     render(); };
+/* ===== Referências do menu e estado ativo ===== */
+const navServ = document.getElementById("nav-servicos");
+const navNovo = document.getElementById("nav-novo");
+function setActiveNav(route) {
+    const onServ = route === "#/servicos" || route.startsWith("#/editar/");
+    const onNovo = route === "#/novo";
+    navServ?.classList.toggle("active", onServ);
+    navNovo?.classList.toggle("active", onNovo);
+}
 /* ===== Navegação superior (estilo homepage) ===== */
 function setupTopNav() {
     document.getElementById("nav-servicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
@@ -329,6 +338,7 @@ async function render() {
     if (!authOk)
         return;
     const r = currentRoute();
+    setActiveNav(r);
     if (r.startsWith("#/editar/")) {
         const id = Number(r.split("/")[2]);
         const svc = Number.isFinite(id) ? await getServiceById(id) : null;
