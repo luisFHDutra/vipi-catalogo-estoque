@@ -170,23 +170,48 @@
 
 /* ===== BOTÃO (modal Fechar) ===== */
 .catalog-body .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid var(--main);
-    background: var(--main);
-    color: #fff;
-    font-weight: 700;
-    cursor: pointer;
-    transition: filter .15s ease, transform .1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--main);
+  background: var(--main);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter .15s ease, transform .1s ease;
 }
 
 .catalog-body .btn:hover {
-    filter: brightness(1.05);
-    transform: translateY(-1px);
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.catalog-body .btn:active {
+  transform: translateY(0);
+}
+
+.catalog-body .btn.ghost {
+  background: transparent;
+  color: var(--main);
+  border-color: var(--main);
+}
+
+.catalog-body .btn.secondary {
+  background: var(--sec1);
+  border-color: var(--sec1);
+}
+
+.catalog-body .btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.catalog-body .btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
 }
 
 /* ===== MODAL (detalhes) ===== */
