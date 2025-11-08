@@ -1,4 +1,3 @@
-// src/pages/public-catalog.ts
 import { clear, el } from "../modules/ui.js";
 import { supabase } from "../supabase/supabaseClient.js";
 
@@ -31,13 +30,13 @@ logoutBtn?.addEventListener("click", async (e) => {
   try { await supabase.auth.signOut(); } finally { location.reload(); }
 });
 
-/* (defensivo) Se ainda existir algum <h2> na seção principal, remove */
+/* (defensivo) Remove qualquer <h2> antigo na seção principal */
 (() => {
   const title = document.querySelector("main section h2");
   if (title) title.remove();
 })();
 
-/* ===== Tipos (apenas o que usamos no catálogo público) ===== */
+/* ===== Tipos do catálogo público ===== */
 type PublicService = {
   id: number;
   created_at: string | null;
@@ -46,19 +45,56 @@ type PublicService = {
   images: string[] | null; // capa = images[0]
 };
 
-/* ===== Data (Supabase) ===== */
-async function listPublicServices(): Promise<PublicService[]> {
-  const { data, error } = await supabase
-    .from("service")
-    .select("id, name, description, images, created_at")
-    .eq("visibility", "public")
-    .order("created_at", { ascending: false });
+/* ===== Estado de listagem (busca + paginação) ===== */
+const state = {
+  q: "",
+  page: 1,
+  pageSize: 12,
+  total: 0
+};
 
-  if (error) throw error;
-  return (data ?? []) as PublicService[];
+function debounce<T extends (...args: any[]) => void>(fn: T, wait = 300) {
+  let t: number | undefined;
+  return (...args: Parameters<T>) => {
+    if (t) clearTimeout(t);
+    t = window.setTimeout(() => fn(...args), wait);
+  };
 }
 
-/* ===== UI ===== */
+/* ===== Data (Supabase) — busca + paginação ===== */
+async function fetchPublicServices(opts: { q?: string; page?: number; pageSize?: number } = {}) {
+  const q = (opts.q ?? state.q).trim();
+  const page = Math.max(1, opts.page ?? state.page);
+  const pageSize = Math.max(1, opts.pageSize ?? state.pageSize);
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from("service")
+    .select("id, name, description, images, created_at", { count: "exact" })
+    .eq("visibility", "public")
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (q) {
+    // escapar curingas para ILIKE
+    const term = q.replace(/[%_]/g, (s) => `\\${s}`);
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  return {
+    items: (data ?? []) as PublicService[],
+    count: count ?? 0,
+    page,
+    pageSize
+  };
+}
+
+/* ===== UI: Modal (detalhes) ===== */
 function openDetailsModalPublic(svc: PublicService) {
   const bd = el("div", { classes: ["modal-backdrop", "show"] });
   const m = el("div", { classes: ["modal"] });
@@ -71,7 +107,6 @@ function openDetailsModalPublic(svc: PublicService) {
   const imgs = (svc.images ?? []) as string[];
   let idx = 0;
 
-  // Galeria
   if (imgs.length) {
     const gallery = el("div", { classes: ["carousel"] });
     const frame = el("div", { classes: ["frame"] });
@@ -118,7 +153,7 @@ function openDetailsModalPublic(svc: PublicService) {
   document.body.appendChild(bd);
 }
 
-/* Lightbox */
+/* ===== Lightbox ===== */
 function openLightbox(images: string[], startIndex = 0) {
   if (!images.length) return;
   let idx = startIndex;
@@ -158,6 +193,7 @@ function openLightbox(images: string[], startIndex = 0) {
   document.body.appendChild(bd);
 }
 
+/* ===== Card ===== */
 function card(svc: PublicService): HTMLElement {
   const a = el("div", { classes: ["card"] });
 
@@ -178,22 +214,148 @@ function card(svc: PublicService): HTMLElement {
   return a;
 }
 
-async function main() {
-  const grid = document.getElementById("services-grid") as HTMLElement | null;
-  if (!grid) return;
+/* ===== Render (lista com busca + paginação) ===== */
+async function renderList() {
+  const app = document.getElementById("app") as HTMLElement | null;
+  const section = (document.querySelector("#app section") as HTMLElement | null) ?? app;
+  if (!section) return;
 
-  // garante classes de grid (caso o HTML não tenha)
-  grid.classList.add("grid");
+  clear(section);
 
-  clear(grid);
+  // Wrapper
+  const pageWrap = el("div");
+  Object.assign(pageWrap.style, { width: "min(1200px, 96vw)", margin: "24px auto" });
+
+  /* --- Toolbar (busca + page size) --- */
+  const toolbar = el("div");
+  Object.assign(toolbar.style, {
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    flexWrap: "wrap",
+    margin: "0 0 16px 0"
+  });
+
+  const input = el("input", {
+    attrs: { id: "pub-search", type: "search", placeholder: "Buscar por nome ou descrição..." }
+  }) as HTMLInputElement;
+  input.value = state.q;
+  Object.assign(input.style, {
+    flex: "1",
+    minWidth: "240px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    border: "1px solid var(--border)"
+  });
+
+  const btnClear = el("button", { classes: ["btn"], text: "Limpar" }) as HTMLButtonElement;
+  btnClear.classList.add("ghost");
+
+  const selPageSize = el("select") as HTMLSelectElement;
+  [12, 24, 48].forEach((n) => selPageSize.append(new Option(String(n), String(n))));
+  selPageSize.value = String(state.pageSize);
+  Object.assign(selPageSize.style, {
+    padding: "10px 12px",
+    borderRadius: "10px",
+    border: "1px solid var(--border)"
+  });
+
+  const info = el("div");
+  Object.assign(info.style, { color: "var(--muted)", fontSize: ".92rem" });
+
+  toolbar.append(input, btnClear, selPageSize, info);
+
+  // Busca (debounce)
+  const onSearch = debounce(async () => {
+    state.q = input.value;
+    state.page = 1;
+    await renderList();
+  }, 300);
+
+  input.addEventListener("input", onSearch);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onSearch(); } });
+  btnClear.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!input.value && !state.q) return;
+    input.value = "";
+    state.q = "";
+    state.page = 1;
+    await renderList();
+  });
+  selPageSize.addEventListener("change", async () => {
+    state.pageSize = Number(selPageSize.value) || 12;
+    state.page = 1;
+    await renderList();
+  });
+
+  /* --- Data --- */
+  let items: PublicService[] = [];
+  let count = 0;
+  let page = state.page;
+  let pageSize = state.pageSize;
 
   try {
-    const services = await listPublicServices();
-    services.forEach(s => grid.appendChild(card(s)));
+    const res = await fetchPublicServices();
+    items = res.items;
+    count = res.count;
+    page = res.page;
+    pageSize = res.pageSize;
   } catch (e) {
     console.error(e);
-    grid.append(el("p", { classes: ["note"], text: "Falha ao carregar os serviços." }));
   }
+
+  const from = count ? (page - 1) * pageSize + 1 : 0;
+  const to = Math.min(page * pageSize, count);
+  info.textContent = count ? `Exibindo ${from}–${to} de ${count}` : "Nenhum serviço encontrado";
+
+  /* --- Grid --- */
+  const grid = el("div", { classes: ["grid"] });
+
+  if (items.length) {
+    items.forEach((s) => grid.appendChild(card(s)));
+  } else {
+    grid.append(el("p", { text: "Sem resultados para o filtro atual." }));
+  }
+
+  /* --- Paginação --- */
+  const pager = el("div");
+  Object.assign(pager.style, {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "16px 0"
+  });
+
+  const btnPrev = el("button", { classes: ["btn"], text: "‹ Anterior" }) as HTMLButtonElement;
+  btnPrev.classList.add("ghost");
+  const btnNext = el("button", { classes: ["btn"], text: "Próxima ›" }) as HTMLButtonElement;
+  btnNext.classList.add("ghost");
+
+  btnPrev.disabled = page <= 1;
+  btnNext.disabled = page * pageSize >= count;
+
+  btnPrev.addEventListener("click", async () => {
+    if (state.page > 1) {
+      state.page -= 1;
+      await renderList();
+    }
+  });
+  btnNext.addEventListener("click", async () => {
+    if (state.page * state.pageSize < count) {
+      state.page += 1;
+      await renderList();
+    }
+  });
+
+  const pageInfo = el("div", { text: `Página ${page} de ${Math.max(1, Math.ceil(count / pageSize))}` });
+  Object.assign(pageInfo.style, { color: "var(--muted)", fontSize: ".92rem" });
+
+  pager.append(btnPrev, pageInfo, btnNext);
+
+  /* --- Compose --- */
+  pageWrap.append(toolbar, grid, pager);
+  section.append(pageWrap);
 }
 
-main();
+/* ===== Boot ===== */
+renderList();
