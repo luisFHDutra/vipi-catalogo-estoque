@@ -48,6 +48,54 @@ async function uploadImages(files: FileList): Promise<string[]> {
   return urls;
 }
 
+/* ===== Estado de listagem (busca + paginação) ===== */
+const state = {
+  q: "",
+  page: 1,
+  pageSize: 12,
+  total: 0
+};
+
+function debounce<T extends (...args: any[]) => void>(fn: T, wait = 300) {
+  let t: number | undefined;
+  return (...args: Parameters<T>) => {
+    if (t) clearTimeout(t);
+    t = window.setTimeout(() => fn(...args), wait);
+  };
+}
+
+/* Busca + paginação no Supabase */
+async function fetchServices(opts: { q?: string; page?: number; pageSize?: number } = {}) {
+  const q = (opts.q ?? state.q).trim();
+  const page = Math.max(1, opts.page ?? state.page);
+  const pageSize = Math.max(1, opts.pageSize ?? state.pageSize);
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from("service")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (q) {
+    // escapa % e _ para evitar efeitos colaterais no ILIKE
+    const term = q.replace(/[%_]/g, (s) => `\\${s}`);
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  return {
+    items: (data ?? []) as DBService[],
+    count: count ?? 0,
+    page,
+    pageSize
+  };
+}
+
 /* ===== Router ===== */
 type Route = "#/servicos" | "#/novo" | `#/editar/${string}`;
 const currentRoute = (): Route => (window.location.hash || "#/servicos") as Route;
@@ -64,7 +112,7 @@ function setActiveNav(route: Route) {
   navNovo?.classList.toggle("active", onNovo);
 }
 
-/* ===== Navegação superior (estilo homepage) ===== */
+/* ===== Navegação superior ===== */
 function setupTopNav() {
   document.getElementById("nav-servicos")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/servicos"); });
   document.getElementById("nav-novo")?.addEventListener("click", (e) => { e.preventDefault(); goto("#/novo"); });
@@ -114,17 +162,89 @@ async function deleteService(id: number) {
 
 /* ===== Views ===== */
 
-// LISTA
+/* LISTA (com busca + paginação) */
 async function renderList() {
   const root = view();
   clear(root);
 
-  const page = el("div", { classes: ["page"] });
+  const pageWrap = el("div", { classes: ["page"] });
 
+  /* --- Toolbar (busca + page size) --- */
+  const toolbar = el("div");
+  Object.assign(toolbar.style, {
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    flexWrap: "wrap",
+    margin: "0 0 16px 0"
+  });
+
+  const input = el("input", {
+    attrs: {
+      id: "svc-search",
+      type: "search",
+      placeholder: "Buscar por nome ou descrição..."
+    }
+  }) as HTMLInputElement;
+  input.value = state.q;
+  Object.assign(input.style, {
+    flex: "1",
+    minWidth: "240px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    border: "1px solid var(--border)"
+  });
+
+  const btnClear = el("button", { classes: ["btn", "ghost"], text: "Limpar" }) as HTMLButtonElement;
+
+  const selPageSize = el("select") as HTMLSelectElement;
+  [12, 24, 48].forEach((n) => selPageSize.append(new Option(String(n), String(n))));
+  selPageSize.value = String(state.pageSize);
+  Object.assign(selPageSize.style, {
+    padding: "10px 12px",
+    borderRadius: "10px",
+    border: "1px solid var(--border)"
+  });
+
+  const info = el("div", { classes: ["muted"] });
+
+  toolbar.append(input, btnClear, selPageSize, info);
+
+  /* --- Busca (debounced) --- */
+  const onSearch = debounce(async () => {
+    state.q = input.value;
+    state.page = 1;
+    await renderList();
+  }, 300);
+
+  input.addEventListener("input", onSearch);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onSearch(); } });
+  btnClear.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!input.value && !state.q) return;
+    input.value = "";
+    state.q = "";
+    state.page = 1;
+    await renderList();
+  });
+  selPageSize.addEventListener("change", async () => {
+    state.pageSize = Number(selPageSize.value) || 12;
+    state.page = 1;
+    await renderList();
+  });
+
+  /* --- Data --- */
+  const { items, count, page, pageSize } = await fetchServices();
+  state.total = count;
+
+  const from = count ? (page - 1) * pageSize + 1 : 0;
+  const to = Math.min(page * pageSize, count);
+  info.textContent = `Exibindo ${from}–${to} de ${count}`;
+
+  /* --- Grid --- */
   const grid = el("div", { classes: ["admin-grid"] });
-  const items = await listAllServices();
 
-  items.forEach(svc => {
+  items.forEach((svc) => {
     const card = el("div", { classes: ["card"] });
 
     const cover = svc.images?.[0];
@@ -161,16 +281,49 @@ async function renderList() {
 
     actions.append(btnEdit, btnToggle, btnDel);
     card.append(title, meta, actions);
-
     card.addEventListener("click", () => openDetailsModal(svc));
+
     grid.append(card);
   });
 
-  page.append(grid);
-  root.append(page);
+  /* --- Paginação --- */
+  const pager = el("div");
+  Object.assign(pager.style, {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "16px 0"
+  });
+
+  const btnPrev = el("button", { classes: ["btn", "ghost"], text: "‹ Anterior" }) as HTMLButtonElement;
+  const btnNext = el("button", { classes: ["btn", "ghost"], text: "Próxima ›" }) as HTMLButtonElement;
+
+  btnPrev.disabled = page <= 1;
+  btnNext.disabled = page * pageSize >= count;
+
+  btnPrev.addEventListener("click", async () => {
+    if (state.page > 1) {
+      state.page -= 1;
+      await renderList();
+    }
+  });
+  btnNext.addEventListener("click", async () => {
+    if (state.page * state.pageSize < state.total) {
+      state.page += 1;
+      await renderList();
+    }
+  });
+
+  const pageInfo = el("div", { classes: ["muted"], text: `Página ${page} de ${Math.max(1, Math.ceil(count / pageSize))}` });
+
+  pager.append(btnPrev, pageInfo, btnNext);
+
+  /* --- Compose --- */
+  pageWrap.append(toolbar, grid, pager);
+  root.append(pageWrap);
 }
 
-// FORM (novo/editar) — com upload no Storage
+/* FORM (novo/editar) — com upload no Storage */
 function renderForm(existing?: DBService) {
   const root = view();
   clear(root);
@@ -254,6 +407,7 @@ function renderForm(existing?: DBService) {
     fldValue.value = existing.price != null ? String(existing.price) : "";
     selVis.value = existing.visibility ?? "private";
     fldNotes.value = existing.notes ?? "";
+    if (Array.isArray(existing.images)) currentImages = existing.images.slice();
   }
   refreshThumbs();
 
@@ -272,7 +426,7 @@ function renderForm(existing?: DBService) {
     if (!payload.name) { alert("Nome é obrigatório."); return; }
 
     // Upload para o Storage e gravação dos URLs no DB
-    const files = fldImgs.files;
+    const files = (document.getElementById("fImgs") as HTMLInputElement)?.files;
     if (files && files.length > 0) {
       try {
         const newUrls = await uploadImages(files);
@@ -307,7 +461,7 @@ function renderForm(existing?: DBService) {
   }
 }
 
-// MODAL de detalhes com galeria simples
+/* MODAL de detalhes com galeria simples */
 function openDetailsModal(svc: DBService) {
   const bd = el("div", { classes: ["modal-backdrop", "show"] });
   const m = el("div", { classes: ["modal"] });
